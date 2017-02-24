@@ -1,0 +1,2 @@
+Halpha_error.fits and Halpha_map.fits are from Finkbeiner 2003ApJS..146..407F and were downloaded from https://faun.rc.fas.harvard.edu/dfink/skymaps/halpha/
+Please cite this paper if you use/reuse these data.
