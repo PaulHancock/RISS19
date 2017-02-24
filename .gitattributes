@@ -1,1 +1,2 @@
-data/*.fits filter=lfs diff=lfs merge=lfs -text
+data/Halpha_error.fits filter=lfs diff=lfs merge=lfs -text
+data/Halpha_map.fits filter=lfs diff=lfs merge=lfs -text
