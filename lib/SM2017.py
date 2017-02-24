@@ -59,7 +59,7 @@ class SM(object):
         :param position: astropy.coordinates.SkyCoord
         :return:
         """
-        x, y = zip(*self.wcs.all_world2pix(zip(position.ra.degree, position.dec.degree), 0))
+        x, y = zip(*self.wcs.all_world2pix(zip(position.galactic.l.degree, position.galactic.b.degree), 0))
         x = np.int64(np.floor(x))
         x = np.clip(x, 0, self.hdu['NAXIS1'])
         y = np.int64(np.floor(y))
