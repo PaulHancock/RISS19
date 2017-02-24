@@ -35,6 +35,7 @@ class SM(object):
         self.beta = 11/3
         self.re = 2.817e-15  # m
         self.rf_1kpc = np.sqrt(self.c * self.kpc / (2*np.pi*self.nu))  # Fresnel scale assuming that D = 1kpc
+        self.v = 1e4  # relative velocity of source/observer in m/s
 
         self.file = ha_file
         self.err_file = err_file
@@ -107,9 +108,7 @@ class SM(object):
         :param position: astropy.coordinates.SkyCoord
         :return:
         """
-
-        #TODO: where does this 1e4 come from?
-        tref = self.rf_1kpc * self.get_xi(position) / 1e4 / seconds_per_year
+        tref = self.rf_1kpc * self.get_xi(position) / self.v / seconds_per_year
         return tref
 
     def get_rms_var(self, position, nyears=1):
