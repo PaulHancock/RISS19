@@ -46,6 +46,8 @@ if __name__ == "__main__":
                         help='Column names to read from input. [ra,dec]')
     group2.add_argument('--out', dest='outfile', default=None, type=str,
                         help="Table of results")
+    group2.add_argument('--append', dest='append', action='store_true', default=False,
+                        help="Append the data to the input data (write a new file)")
     group2.add_argument('--pos', dest='pos', default=None, nargs=2, type=float,
                         help="Single coordinates in ra/dec degrees")
 
@@ -79,10 +81,11 @@ if __name__ == "__main__":
         pos = SkyCoord(ra*u.degree, dec*u.degree)
         # make the SM object
         sm = SM(os.path.join('data', 'Halpha_map.fits'), nu=nu)
-        # make a new table for writing
-        tab = Table()
-        tab.add_column(ra)
-        tab.add_column(dec)
+        # make a new table for writing and copy the ra/dec unless we are appending to the old file
+        if not results.append:
+            tab = Table()
+            tab.add_column(ra)
+            tab.add_column(dec)
         if results.halpha:
             tab.add_column(Column(data=sm.get_halpha(pos), name='Halpha'))
         if results.xi:
