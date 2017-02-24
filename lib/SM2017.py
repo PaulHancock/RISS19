@@ -22,10 +22,10 @@ seconds_per_year = 3600 * 24 * 365.25
 
 
 class SM(object):
-    def __init__(self, ha_file, err_file=None):
+    def __init__(self, ha_file, err_file=None, nu=185e6):
         # define some of the constants that we need
         # i'm saving these here to allow for different instances to have different values
-        self.nu = 185e6  # MHz
+        self.nu = nu  # Hz
         self.kpc = kpc.value  # in m
         self.t4 = 0.8  # t/1e4 K
         self.lo = 1e18/(self.kpc*1e-3)  # pc
@@ -59,6 +59,8 @@ class SM(object):
         :param position: astropy.coordinates.SkyCoord
         :return:
         """
+        # The coordinates we request need to be the same as that in the WCS header
+        # for the files in this repo, this currently means galactic coordinates.
         x, y = zip(*self.wcs.all_world2pix(zip(position.galactic.l.degree, position.galactic.b.degree), 0))
         x = np.int64(np.floor(x))
         x = np.clip(x, 0, self.hdu['NAXIS1'])
