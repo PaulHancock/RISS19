@@ -73,10 +73,12 @@ class SM(object):
     def get_sm(self, position):
         """
         Return the scintillation measure for a given location on the sky.
+        Units are kpc m^{-20/3}
         :param position: astropy.coordinates.SkyCoord
         :return:
         """
         iha = self.get_halpha(position)
+        #TODO: Cordes2002 doesn't exist. Find out what the proper reference is.
         # Cordes2002
         sm2 = iha/198 * self.t4**0.9 * self.eps**2/(1+self.eps**2) * self.lo**(-2/3)
         return sm2
@@ -84,6 +86,7 @@ class SM(object):
     def get_xi(self, position):
         """
         calculate the parameter ξ for a given sky coord
+        Parameter is dimensionless
         :param position: astropy.coordinates.SkyCoord
         :return: parameter ξ
         """
@@ -105,6 +108,7 @@ class SM(object):
     def get_timescale(self, position):
         """
         calculate the refractive timescale using parameter ξ for a given sky coord
+        timescale is in years
         :param position: astropy.coordinates.SkyCoord
         :return:
         """
@@ -114,6 +118,7 @@ class SM(object):
     def get_rms_var(self, position, nyears=1):
         """
         calculate the expected RMS variation in nyears at a given sky coord
+        rms variability is fraction/year
         :param position: astropy.coordinates.SkyCoord
         :param nyears: timescale of interest
         :return:
