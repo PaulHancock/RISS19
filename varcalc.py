@@ -27,15 +27,15 @@ if __name__ == "__main__":
     group1.add_argument('-H', '--Halpha', dest='halpha', action='store_true', default=False,
                         help='Calculate Hα intensity (Rayleighs)')
     group1.add_argument('-x', '--xi', dest='xi', action='store_true', default=False,
-                        help='Calculate ξ')
+                        help='Calculate ξ (dimensionless)')
     group1.add_argument('-m', '--modulation', dest='m', action='store_true', default=False,
-                        help='Calculate modulation index')
+                        help='Calculate modulation index (fraction)')
     group1.add_argument('-s', '--sm', dest='sm', action='store_true', default=False,
-                        help='Calculate scintillation measure')
+                        help='Calculate scintillation measure (kpc m^{-20/3}')
     group1.add_argument('-t', '--timescale', dest='t0', action='store_true', default=False,
-                        help='Calculate timescale of variability')
+                        help='Calculate timescale of variability (years)')
     group1.add_argument('-r', '--rms', dest='rms', action='store_true', default=False,
-                        help='Calculate rms variability over 1 year')
+                        help='Calculate rms variability over 1 year (fraction/year)')
     group1.add_argument('--all', dest='do_all', action='store_true', default=False,
                         help='Include all parameters')
 
