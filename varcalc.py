@@ -66,8 +66,10 @@ if __name__ == "__main__":
     # For doing a one off position calculation
 
     if results.galactic:
+        print("Using galactic corrdinates")
         frame = 'galactic'
     else:
+        print("Using fk5 coordinates")
         frame = 'fk5'
 
     if results.pos:
@@ -94,6 +96,8 @@ if __name__ == "__main__":
             tab = Table()
             tab.add_column(ra)
             tab.add_column(dec)
+        else:
+            print("Appending results to existing table")
         if results.halpha:
             tab.add_column(Column(data=sm.get_halpha(pos), name='Halpha'))
         if results.xi:
@@ -106,6 +110,7 @@ if __name__ == "__main__":
             tab.add_column(Column(data=sm.get_timescale(pos), name='t0'))
         if results.rms:
             tab.add_column(Column(data=sm.get_rms_var(pos), name='rms1yr'))
+        print("Writing to {0}".format(results.outfile))
         tab.write(results.outfile, overwrite=True)
 
 
