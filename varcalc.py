@@ -18,7 +18,7 @@ warnings.simplefilter('ignore', category=AstropyWarning)
 
 
 __author__ = 'Paul Hancock'
-__date__ = '2017-02-24'
+__date__ = '2017-03-02'
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -66,7 +66,7 @@ if __name__ == "__main__":
     # For doing a one off position calculation
 
     if results.galactic:
-        print("Using galactic corrdinates")
+        print("Using galactic coordinates")
         frame = 'galactic'
     else:
         print("Using fk5 coordinates")
