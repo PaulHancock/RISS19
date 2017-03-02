@@ -50,6 +50,8 @@ if __name__ == "__main__":
                         help="Append the data to the input data (write a new file)")
     group2.add_argument('--pos', dest='pos', default=None, nargs=2, type=float,
                         help="Single coordinates in ra/dec degrees")
+    group2.add_argument('-g', '--galactic', dest='galactic', action='store_true', default=False,
+                        help='Interpret input coordinates as l/b instead of ra/dec (default False)')
 
     group3 = parser.add_argument_group('Input parameter settings')
     group3.add_argument('--freq', dest='frequency', default=185, type=float,
@@ -62,9 +64,15 @@ if __name__ == "__main__":
 
     nu = results.frequency*1e6
     # For doing a one off position calculation
+
+    if results.galactic:
+        frame = 'galactic'
+    else:
+        frame = 'fk5'
+
     if results.pos:
         ra, dec = results.pos
-        pos = SkyCoord([ra]*u.degree, [dec]*u.degree)
+        pos = SkyCoord([ra]*u.degree, [dec]*u.degree, frame=frame)
         sm = SM(os.path.join('data', 'Halpha_map.fits'), nu=nu)
         print(sm.get_halpha(pos))
         sys.exit()
@@ -78,7 +86,7 @@ if __name__ == "__main__":
         ra = tab[results.cols[0]]
         dec = tab[results.cols[1]]
         # create the sky coordinate
-        pos = SkyCoord(ra*u.degree, dec*u.degree)
+        pos = SkyCoord(ra*u.degree, dec*u.degree, frame=frame)
         # make the SM object
         sm = SM(os.path.join('data', 'Halpha_map.fits'), nu=nu)
         # make a new table for writing and copy the ra/dec unless we are appending to the old file
