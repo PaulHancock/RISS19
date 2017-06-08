@@ -78,7 +78,6 @@ class SM(object):
         :return:
         """
         iha = self.get_halpha(position)
-        #TODO: Cordes2002 doesn't exist. Find out what the proper reference is.
         # Cordes2002
         sm2 = iha/198 * self.t4**0.9 * self.eps**2/(1+self.eps**2) * self.lo**(-2/3)
         return sm2
