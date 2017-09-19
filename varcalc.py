@@ -31,7 +31,7 @@ if __name__ == "__main__":
     group1.add_argument('-m', '--modulation', dest='m', action='store_true', default=False,
                         help='Calculate modulation index (fraction)')
     group1.add_argument('-s', '--sm', dest='sm', action='store_true', default=False,
-                        help='Calculate scintillation measure (kpc m^{-20/3}')
+                        help='Calculate scintillation measure (kpc m^{-20/3})')
     group1.add_argument('-t', '--timescale', dest='t0', action='store_true', default=False,
                         help='Calculate timescale of variability (years)')
     group1.add_argument('-r', '--rms', dest='rms', action='store_true', default=False,
@@ -76,8 +76,19 @@ if __name__ == "__main__":
         ra, dec = results.pos
         pos = SkyCoord([ra]*u.degree, [dec]*u.degree, frame=frame)
         sm = SM(os.path.join('data', 'Halpha_map.fits'), nu=nu)
-        print(sm.get_halpha(pos))
-        sys.exit()
+        if results.halpha:
+            print("Halpha: ", sm.get_halpha(pos), "(Rayleighs)")
+        if results.xi:
+            print("xi: ", sm.get_xi(pos))
+        if results.sm:
+            print("sm: ", sm.get_sm(pos), "kpc m^{-20/3}")
+        if results.m:
+            print("m: ", sm.get_m(pos), "%")
+        if results.t0:
+            print("t0: ", sm.get_timescale(pos), "years")
+        if results.rms:
+            print("rms: ", sm.get_rms_var(pos), "%/1year")
+        sys.exit(0)
 
     if results.infile:
         if not results.outfile:
