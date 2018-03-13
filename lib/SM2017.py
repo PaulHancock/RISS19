@@ -95,9 +95,9 @@ class SM(object):
         sm2, err_sm2 = self.get_sm(position)
         rdiff = (2**(2-self.beta) * (np.pi * self.re**2 * (self.c/self.nu)**2 * self.beta) * sm2 * self.kpc *
                  gamma(-self.beta/2)/gamma(self.beta/2))**(1/(2-self.beta))
-        err_rdiff=(1/(2-self.beta))*(err_sm2/sm2)*rdiff
+        err_rdiff=abs((1/(2-self.beta))*(err_sm2/sm2)*rdiff)
         xi = self.rf_1kpc / rdiff
-        err_xi= (1/3)*(err_rdiff/rdiff)*xi
+        err_xi= (err_rdiff/rdiff)*xi
         return xi, err_xi
 
     def get_m(self, position):
@@ -108,7 +108,7 @@ class SM(object):
         """
         xi, err_xi = self.get_xi(position)
         m = xi**(-1/3)
-        err_m=(err_xi/xi)*m
+        err_m=(1/3)*(err_xi/xi)*m
         return m, err_m
 
     def get_timescale(self, position):
