@@ -97,7 +97,7 @@ class SM(object):
                  gamma(-self.beta/2)/gamma(self.beta/2))**(1/(2-self.beta))
         err_rdiff=(err_sm2/sm2)*rdiff
         xi = self.rf_1kpc / rdiff
-        err_xi= 3*(err_rdiff/rdiff)*xi
+        err_xi= (1/3)*(err_rdiff/rdiff)*xi
         return xi, err_xi
 
     def get_m(self, position):
