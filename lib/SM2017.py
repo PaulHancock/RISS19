@@ -6,6 +6,7 @@ from __future__ import print_function, division
 NE2001 for extragalactic work.
 """
 
+
 from astropy.constants import kpc, c
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
@@ -42,13 +43,13 @@ class SM(object):
         self._load_file()
 
     def _load_file(self):
-        self.hdu = fits.getheader(self.file)
+        self.hdu = fits.getheader(self.file, ignore_missing_end=True)
         self.wcs = WCS(self.hdu)
-        self.data = fits.open(self.file, memmap=True)[0].data
+        self.data = fits.open(self.file, memmap=True, ignore_missing_end=True)[0].data
         if self.err_file:
-            self.err_hdu = fits.getheader(self.err_file)
+            self.err_hdu = fits.getheader(self.err_file,ignore_missing_end=True)
             self.err_wcs = WCS(self.err_hdu)
-            self.err_data = fits.open(self.err_file, memmap=True)[0].data
+            self.err_data = fits.open(self.err_file, memmap=True, ignore_missing_end=True)[0].data
         else:
             self.err_hud = self.err_wcs = self.err_data = None
 
@@ -68,7 +69,8 @@ class SM(object):
         y = np.int64(np.floor(y))
         y = np.clip(y, 0, self.hdu['NAXIS2'])
         iha = self.data[y, x]
-        return iha
+        iha_err=self.err_data[y, x]
+        return iha, iha_err
 
     def get_sm(self, position):
         """
@@ -77,10 +79,11 @@ class SM(object):
         :param position: astropy.coordinates.SkyCoord
         :return:
         """
-        iha = self.get_halpha(position)
+        iha, err_iha = self.get_halpha(position)
         # Cordes2002
         sm2 = iha/198 * self.t4**0.9 * self.eps**2/(1+self.eps**2) * self.lo**(-2/3)
-        return sm2
+        err_sm2= (err_iha/iha)*sm2
+        return sm2, err_sm2
 
     def get_xi(self, position):
         """
@@ -89,11 +92,13 @@ class SM(object):
         :param position: astropy.coordinates.SkyCoord
         :return: parameter ξ
         """
-        sm2 = self.get_sm(position)
+        sm2, err_sm2 = self.get_sm(position)
         rdiff = (2**(2-self.beta) * (np.pi * self.re**2 * (self.c/self.nu)**2 * self.beta) * sm2 * self.kpc *
                  gamma(-self.beta/2)/gamma(self.beta/2))**(1/(2-self.beta))
+        err_rdiff=(err_sm2/sm2)*rdiff
         xi = self.rf_1kpc / rdiff
-        return xi
+        err_xi= 3*(err_rdiff/rdiff)*xi
+        return xi, err_xi
 
     def get_m(self, position):
         """
@@ -101,8 +106,10 @@ class SM(object):
         :param position: astropy.coordinates.SkyCoord
         :return:
         """
-        m = self.get_xi(position)**(-1/3)
-        return m
+        xi, err_xi = self.get_xi(position)
+        m = xi**(-1/3)
+        err_m=(err_xi/xi)*m
+        return m, err_m
 
     def get_timescale(self, position):
         """
@@ -111,8 +118,10 @@ class SM(object):
         :param position: astropy.coordinates.SkyCoord
         :return:
         """
-        tref = self.rf_1kpc * self.get_xi(position) / self.v / seconds_per_year
-        return tref
+        xi, err_xi = self.get_xi(position)
+        tref = self.rf_1kpc *xi / self.v / seconds_per_year
+        err_tref=(err_xi/xi)*tref
+        return tref, err_tref
 
     def get_rms_var(self, position, nyears=1):
         """
@@ -122,8 +131,12 @@ class SM(object):
         :param nyears: timescale of interest
         :return:
         """
-        t = self.get_m(position)/self.get_timescale(position) * nyears
-        return t
+        tref, err_tref=self.get_timescale(position)
+        m, err_m= self.get_m(position)
+        #basic uncertainty propagation, can probably change.
+        t =m/tref * nyears
+        err_t=((err_m/m)+(err_tref/tref))*t
+        return t, err_t
 
 
 def test_all_params():
