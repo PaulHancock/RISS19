@@ -95,7 +95,7 @@ class SM(object):
         sm2, err_sm2 = self.get_sm(position)
         rdiff = (2**(2-self.beta) * (np.pi * self.re**2 * (self.c/self.nu)**2 * self.beta) * sm2 * self.kpc *
                  gamma(-self.beta/2)/gamma(self.beta/2))**(1/(2-self.beta))
-        err_rdiff=(err_sm2/sm2)*rdiff
+        err_rdiff=(1/(2-self.beta))*(err_sm2/sm2)*rdiff
         xi = self.rf_1kpc / rdiff
         err_xi= (1/3)*(err_rdiff/rdiff)*xi
         return xi, err_xi
