@@ -69,8 +69,8 @@ class SM(object):
         y = np.int64(np.floor(y))
         y = np.clip(y, 0, self.hdu['NAXIS2'])
         iha = self.data[y, x]
-        iha_err=self.err_data[y, x]
-        return iha, iha_err
+        err_iha=self.err_data[y, x]
+        return iha, err_iha
 
     def get_sm(self, position):
         """
