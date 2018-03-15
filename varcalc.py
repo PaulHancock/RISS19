@@ -110,9 +110,11 @@ if __name__ == "__main__":
         else:
             print("Appending results to existing table")
         if results.halpha:
-            tab.add_column(Column(data=sm.get_halpha(pos), name='Halpha'))
+            tab.add_column(Column(data=sm.get_halpha(pos)[0], name='Halpha'))
+            tab.add_column(Column(data=sm.get_halpha(pos)[1], name='Err_Halpha'))
         if results.xi:
-            tab.add_column(Column(data=sm.get_xi(pos), name='xi'))
+            tab.add_column(Column(data=sm.get_xi(pos)[0], name='xi'))
+            tab.add_column(Column(data=sm.get_xi(pos)[1], name='xi'))
         if results.sm:
             tab.add_column(Column(data=sm.get_sm(pos), name='sm'))
         if results.m:
