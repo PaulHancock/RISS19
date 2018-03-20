@@ -8,6 +8,7 @@ import astropy.units as u
 from astropy.utils.exceptions import AstropyWarning
 
 from lib.SM2017 import SM
+import logging
 import os
 import sys
 import argparse
@@ -16,6 +17,10 @@ import argparse
 import warnings
 warnings.simplefilter('ignore', category=AstropyWarning)
 
+# configure logging
+logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
+log = logging.getLogger("varcalc")
+log.setLevel(logging.INFO)
 
 __author__ = 'Paul Hancock'
 __date__ = '2017-03-02'
@@ -52,12 +57,17 @@ if __name__ == "__main__":
                         help="Single coordinates in ra/dec degrees")
     group2.add_argument('-g', '--galactic', dest='galactic', action='store_true', default=False,
                         help='Interpret input coordinates as l/b instead of ra/dec (default False)')
+    group2.add_argument('--debug', dest='debug', action='store_true', default=False,
+                        help='Debug mode (default False)')
 
     group3 = parser.add_argument_group('Input parameter settings')
     group3.add_argument('--freq', dest='frequency', default=185, type=float,
                         help="Frequency in MHz")
 
     results = parser.parse_args()
+
+    if results.debug:
+        log.setLevel(logging.DEBUG)
 
     if results.do_all:
         results.halpha = results.sm = results.m = results.rms = results.xi = results.t0 = True
@@ -66,18 +76,24 @@ if __name__ == "__main__":
     # For doing a one off position calculation
 
     if results.galactic:
-        print("Using galactic coordinates")
+        log.info("Using galactic coordinates")
         frame = 'galactic'
     else:
-        print("Using fk5 coordinates")
+        log.info("Using fk5 coordinates")
         frame = 'fk5'
 
     if results.pos:
         ra, dec = results.pos
         pos = SkyCoord([ra]*u.degree, [dec]*u.degree, frame=frame)
-        sm = SM(os.path.join('data', 'Halpha_map.fits'), nu=nu)
+        log.info(os.path.join('data', 'Halpha_err.fits'))
+        sm = SM(ha_file=os.path.join('data', 'Halpha_map.fits'),
+                err_file=os.path.join('data', 'Halpha_err.fits'),
+                nu=nu,
+                log=log)
         if results.halpha:
-            print("Halpha: ", sm.get_halpha(pos), "(Rayleighs)")
+            val,err=sm.get_halpha(pos)
+            print("Halpha: ", val, "(Rayleighs)")
+            print("Err_Halpha: ", err, "(Rayleighs)")
         if results.xi:
             print("xi: ", sm.get_xi(pos))
         if results.sm:
@@ -101,7 +117,10 @@ if __name__ == "__main__":
         # create the sky coordinate
         pos = SkyCoord(ra*u.degree, dec*u.degree, frame=frame)
         # make the SM object
-        sm = SM(os.path.join('data', 'Halpha_map.fits'), nu=nu)
+        sm = SM(ha_file=os.path.join('data', 'Halpha_map.fits'),
+                err_file=os.path.join('data', 'Halpha_error.fits'),
+                nu=nu,
+                log=log)
         # make a new table for writing and copy the ra/dec unless we are appending to the old file
         if not results.append:
             tab = Table()
@@ -110,8 +129,9 @@ if __name__ == "__main__":
         else:
             print("Appending results to existing table")
         if results.halpha:
-            tab.add_column(Column(data=sm.get_halpha(pos)[0], name='Halpha'))
-            tab.add_column(Column(data=sm.get_halpha(pos)[1], name='Err_Halpha'))
+            val,err=sm.get_halpha(pos)
+            tab.add_column(Column(data=val, name='Halpha'))
+            tab.add_column(Column(data=err, name='err_Halpha'))
         if results.xi:
             tab.add_column(Column(data=sm.get_xi(pos)[0], name='xi'))
             tab.add_column(Column(data=sm.get_xi(pos)[1], name='xi'))
