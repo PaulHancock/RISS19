@@ -91,19 +91,30 @@ if __name__ == "__main__":
                 nu=nu,
                 log=log)
         if results.halpha:
+            logging.debug(sm.get_halpha(pos))
             val,err=sm.get_halpha(pos)
             print("Halpha: ", val, "(Rayleighs)")
-            print("Err_Halpha: ", err, "(Rayleighs)")
+            print("err_Halpha: ", err, "(Rayleighs)")
         if results.xi:
-            print("xi: ", sm.get_xi(pos))
+            val, err = sm.get_xi(pos)
+            print("xi: ", val)
+            print("err_xi: ", err)
         if results.sm:
-            print("sm: ", sm.get_sm(pos), "kpc m^{-20/3}")
+            val, err = sm.get_sm(pos)
+            print("sm: ", val, "kpc m^{-20/3}")
+            print("err_sm: ", err, "kpc m^{-20/3}")
         if results.m:
-            print("m: ", sm.get_m(pos), "%")
+            val, err = sm.get_m(pos)
+            print("m: ", val, "%")
+            print("err_m: ", err, "%")
         if results.t0:
-            print("t0: ", sm.get_timescale(pos), "years")
+            val, err = sm.get_timescale(pos)
+            print("t0: ", val, "years")
+            print("err_t0: ", err, "years")
         if results.rms:
-            print("rms: ", sm.get_rms_var(pos), "%/1year")
+            val, err = sm.get_rms_var(pos)
+            print("rms: ", val, "%/1year")
+            print("rms: ", err, "%/1year")
         sys.exit(0)
 
     if results.infile:
@@ -133,16 +144,25 @@ if __name__ == "__main__":
             tab.add_column(Column(data=val, name='Halpha'))
             tab.add_column(Column(data=err, name='err_Halpha'))
         if results.xi:
-            tab.add_column(Column(data=sm.get_xi(pos)[0], name='xi'))
-            tab.add_column(Column(data=sm.get_xi(pos)[1], name='xi'))
+            val, err = sm.get_xi(pos)
+            tab.add_column(Column(data=val, name='xi'))
+            tab.add_column(Column(data=err, name='err_xi'))
         if results.sm:
-            tab.add_column(Column(data=sm.get_sm(pos), name='sm'))
+            val, err = sm.get_sm(pos)
+            tab.add_column(Column(data=val, name='sm'))
+            tab.add_column(Column(data=err, name='err_sm'))
         if results.m:
-            tab.add_column(Column(data=sm.get_m(pos), name='m'))
+            val, err = sm.get_m(pos)
+            tab.add_column(Column(data=val, name='m'))
+            tab.add_column(Column(data=err, name='err_m'))
         if results.t0:
-            tab.add_column(Column(data=sm.get_timescale(pos), name='t0'))
+            val, err = sm.get_timescale(pos)
+            tab.add_column(Column(data=val, name='t0'))
+            tab.add_column(Column(data=err, name='err_t0'))
         if results.rms:
-            tab.add_column(Column(data=sm.get_rms_var(pos), name='rms1yr'))
+            val, err = sm.get_rms_var(pos)
+            tab.add_column(Column(data=val, name='rms1yr'))
+            tab.add_column(Column(data=err, name='err_rms1yr'))
         print("Writing to {0}".format(results.outfile))
         tab.write(results.outfile, overwrite=True)
 
