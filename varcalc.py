@@ -114,7 +114,7 @@ if __name__ == "__main__":
         if results.rms:
             val, err = sm.get_rms_var(pos)
             print("rms: ", val, "%/1year")
-            print("rms: ", err, "%/1year")
+            print("err_rms: ", err, "%/1year")
         sys.exit(0)
 
     if results.infile:
