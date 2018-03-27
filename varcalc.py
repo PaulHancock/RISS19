@@ -85,9 +85,9 @@ if __name__ == "__main__":
     if results.pos:
         ra, dec = results.pos
         pos = SkyCoord([ra]*u.degree, [dec]*u.degree, frame=frame)
-        log.info(os.path.join('data', 'Halpha_err.fits'))
+        log.info(os.path.join('data', 'Halpha_error.fits'))
         sm = SM(ha_file=os.path.join('data', 'Halpha_map.fits'),
-                err_file=os.path.join('data', 'Halpha_err.fits'),
+                err_file=os.path.join('data', 'Halpha_error.fits'),
                 nu=nu,
                 log=log)
         if results.halpha:
