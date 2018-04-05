@@ -14,6 +14,7 @@ from astropy.wcs import WCS
 import astropy.units as u
 import numpy as np
 import os
+import logging
 from scipy.special import gamma
 
 __author__ = 'Paul Hancock'
@@ -21,9 +22,16 @@ __date__ = '2017-02-23'
 
 seconds_per_year = 3600 * 24 * 365.25
 
-
 class SM(object):
-    def __init__(self, ha_file, err_file=None, nu=185e6):
+    def __init__(self, ha_file, err_file=None, nu=185e6, log=None):
+
+        if log is None:
+            logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
+            self.log = logging.getLogger("SM2017")
+            self.log.setLevel(logging.DEBUG)
+        else:
+            self.log=log
+
         # define some of the constants that we need
         # i'm saving these here to allow for different instances to have different values
         self.nu = nu  # Hz
@@ -37,7 +45,7 @@ class SM(object):
         self.re = 2.817e-15  # m
         self.rf_1kpc = np.sqrt(self.c * self.kpc / (2*np.pi*self.nu))  # Fresnel scale assuming that D = 1kpc
         self.v = 1e4  # relative velocity of source/observer in m/s
-
+        self.log.debug("data:{0} err:{1}".format(ha_file,err_file))
         self.file = ha_file
         self.err_file = err_file
         self._load_file()
@@ -69,8 +77,8 @@ class SM(object):
         y = np.int64(np.floor(y))
         y = np.clip(y, 0, self.hdu['NAXIS2'])
         iha = self.data[y, x]
-        iha_err=self.err_data[y, x]
-        return iha, iha_err
+        err_iha = self.err_data[y, x]
+        return iha, err_iha
 
     def get_sm(self, position):
         """
@@ -95,9 +103,9 @@ class SM(object):
         sm2, err_sm2 = self.get_sm(position)
         rdiff = (2**(2-self.beta) * (np.pi * self.re**2 * (self.c/self.nu)**2 * self.beta) * sm2 * self.kpc *
                  gamma(-self.beta/2)/gamma(self.beta/2))**(1/(2-self.beta))
-        err_rdiff=(err_sm2/sm2)*rdiff
+        err_rdiff=abs((1/(2-self.beta))*(err_sm2/sm2)*rdiff)
         xi = self.rf_1kpc / rdiff
-        err_xi= 3*(err_rdiff/rdiff)*xi
+        err_xi= (err_rdiff/rdiff)*xi
         return xi, err_xi
 
     def get_m(self, position):
@@ -108,7 +116,7 @@ class SM(object):
         """
         xi, err_xi = self.get_xi(position)
         m = xi**(-1/3)
-        err_m=(err_xi/xi)*m
+        err_m=(1/3)*(err_xi/xi)*m
         return m, err_m
 
     def get_timescale(self, position):

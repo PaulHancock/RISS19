@@ -8,6 +8,7 @@ import astropy.units as u
 from astropy.utils.exceptions import AstropyWarning
 
 from lib.SM2017 import SM
+import logging
 import os
 import sys
 import argparse
@@ -16,6 +17,10 @@ import argparse
 import warnings
 warnings.simplefilter('ignore', category=AstropyWarning)
 
+# configure logging
+logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
+log = logging.getLogger("varcalc")
+log.setLevel(logging.INFO)
 
 __author__ = 'Paul Hancock'
 __date__ = '2017-03-02'
@@ -52,12 +57,17 @@ if __name__ == "__main__":
                         help="Single coordinates in ra/dec degrees")
     group2.add_argument('-g', '--galactic', dest='galactic', action='store_true', default=False,
                         help='Interpret input coordinates as l/b instead of ra/dec (default False)')
+    group2.add_argument('--debug', dest='debug', action='store_true', default=False,
+                        help='Debug mode (default False)')
 
     group3 = parser.add_argument_group('Input parameter settings')
     group3.add_argument('--freq', dest='frequency', default=185, type=float,
                         help="Frequency in MHz")
 
     results = parser.parse_args()
+
+    if results.debug:
+        log.setLevel(logging.DEBUG)
 
     if results.do_all:
         results.halpha = results.sm = results.m = results.rms = results.xi = results.t0 = True
@@ -66,28 +76,45 @@ if __name__ == "__main__":
     # For doing a one off position calculation
 
     if results.galactic:
-        print("Using galactic coordinates")
+        log.info("Using galactic coordinates")
         frame = 'galactic'
     else:
-        print("Using fk5 coordinates")
+        log.info("Using fk5 coordinates")
         frame = 'fk5'
 
     if results.pos:
         ra, dec = results.pos
         pos = SkyCoord([ra]*u.degree, [dec]*u.degree, frame=frame)
-        sm = SM(os.path.join('data', 'Halpha_map.fits'), nu=nu)
+        log.info(os.path.join('data', 'Halpha_error.fits'))
+        sm = SM(ha_file=os.path.join('data', 'Halpha_map.fits'),
+                err_file=os.path.join('data', 'Halpha_error.fits'),
+                nu=nu,
+                log=log)
         if results.halpha:
-            print("Halpha: ", sm.get_halpha(pos), "(Rayleighs)")
+            logging.debug(sm.get_halpha(pos))
+            val,err=sm.get_halpha(pos)
+            print("Halpha: ", val, "(Rayleighs)")
+            print("err_Halpha: ", err, "(Rayleighs)")
         if results.xi:
-            print("xi: ", sm.get_xi(pos))
+            val, err = sm.get_xi(pos)
+            print("xi: ", val)
+            print("err_xi: ", err)
         if results.sm:
-            print("sm: ", sm.get_sm(pos), "kpc m^{-20/3}")
+            val, err = sm.get_sm(pos)
+            print("sm: ", val, "kpc m^{-20/3}")
+            print("err_sm: ", err, "kpc m^{-20/3}")
         if results.m:
-            print("m: ", sm.get_m(pos), "%")
+            val, err = sm.get_m(pos)
+            print("m: ", val, "%")
+            print("err_m: ", err, "%")
         if results.t0:
-            print("t0: ", sm.get_timescale(pos), "years")
+            val, err = sm.get_timescale(pos)
+            print("t0: ", val, "years")
+            print("err_t0: ", err, "years")
         if results.rms:
-            print("rms: ", sm.get_rms_var(pos), "%/1year")
+            val, err = sm.get_rms_var(pos)
+            print("rms: ", val, "%/1year")
+            print("err_rms: ", err, "%/1year")
         sys.exit(0)
 
     if results.infile:
@@ -101,7 +128,10 @@ if __name__ == "__main__":
         # create the sky coordinate
         pos = SkyCoord(ra*u.degree, dec*u.degree, frame=frame)
         # make the SM object
-        sm = SM(os.path.join('data', 'Halpha_map.fits'), nu=nu)
+        sm = SM(ha_file=os.path.join('data', 'Halpha_map.fits'),
+                err_file=os.path.join('data', 'Halpha_error.fits'),
+                nu=nu,
+                log=log)
         # make a new table for writing and copy the ra/dec unless we are appending to the old file
         if not results.append:
             tab = Table()
@@ -110,17 +140,29 @@ if __name__ == "__main__":
         else:
             print("Appending results to existing table")
         if results.halpha:
-            tab.add_column(Column(data=sm.get_halpha(pos), name='Halpha'))
+            val,err=sm.get_halpha(pos)
+            tab.add_column(Column(data=val, name='Halpha'))
+            tab.add_column(Column(data=err, name='err_Halpha'))
         if results.xi:
-            tab.add_column(Column(data=sm.get_xi(pos), name='xi'))
+            val, err = sm.get_xi(pos)
+            tab.add_column(Column(data=val, name='xi'))
+            tab.add_column(Column(data=err, name='err_xi'))
         if results.sm:
-            tab.add_column(Column(data=sm.get_sm(pos), name='sm'))
+            val, err = sm.get_sm(pos)
+            tab.add_column(Column(data=val, name='sm'))
+            tab.add_column(Column(data=err, name='err_sm'))
         if results.m:
-            tab.add_column(Column(data=sm.get_m(pos), name='m'))
+            val, err = sm.get_m(pos)
+            tab.add_column(Column(data=val, name='m'))
+            tab.add_column(Column(data=err, name='err_m'))
         if results.t0:
-            tab.add_column(Column(data=sm.get_timescale(pos), name='t0'))
+            val, err = sm.get_timescale(pos)
+            tab.add_column(Column(data=val, name='t0'))
+            tab.add_column(Column(data=err, name='err_t0'))
         if results.rms:
-            tab.add_column(Column(data=sm.get_rms_var(pos), name='rms1yr'))
+            val, err = sm.get_rms_var(pos)
+            tab.add_column(Column(data=val, name='rms1yr'))
+            tab.add_column(Column(data=err, name='err_rms1yr'))
         print("Writing to {0}".format(results.outfile))
         tab.write(results.outfile, overwrite=True)
 
