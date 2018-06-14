@@ -72,6 +72,9 @@ if __name__ == "__main__":
     if results.do_all:
         results.halpha = results.sm = results.m = results.rms = results.xi = results.t0 = True
 
+    # data is stored in the data dir, relative to *this* file
+    datadir = os.path.join(os.path.dirname(__file__), 'data')
+
     nu = results.frequency*1e6
     # For doing a one off position calculation
 
@@ -85,9 +88,9 @@ if __name__ == "__main__":
     if results.pos:
         ra, dec = results.pos
         pos = SkyCoord([ra]*u.degree, [dec]*u.degree, frame=frame)
-        log.info(os.path.join('data', 'Halpha_error.fits'))
-        sm = SM(ha_file=os.path.join('data', 'Halpha_map.fits'),
-                err_file=os.path.join('data', 'Halpha_error.fits'),
+        log.info(os.path.join(datadir, 'Halpha_error.fits'))
+        sm = SM(ha_file=os.path.join(datadir, 'Halpha_map.fits'),
+                err_file=os.path.join(datadir, 'Halpha_error.fits'),
                 nu=nu,
                 log=log)
         if results.halpha:
@@ -128,8 +131,8 @@ if __name__ == "__main__":
         # create the sky coordinate
         pos = SkyCoord(ra*u.degree, dec*u.degree, frame=frame)
         # make the SM object
-        sm = SM(ha_file=os.path.join('data', 'Halpha_map.fits'),
-                err_file=os.path.join('data', 'Halpha_error.fits'),
+        sm = SM(ha_file=os.path.join(datadir, 'Halpha_map.fits'),
+                err_file=os.path.join(datadir, 'Halpha_error.fits'),
                 nu=nu,
                 log=log)
         # make a new table for writing and copy the ra/dec unless we are appending to the old file
