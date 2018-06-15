@@ -41,6 +41,8 @@ if __name__ == "__main__":
                         help='Calculate timescale of variability (years)')
     group1.add_argument('-r', '--rms', dest='rms', action='store_true', default=False,
                         help='Calculate rms variability over 1 year (fraction/year)')
+    group1.add_argument('-d', '--theta', dest='theta', action='store_true', default=False,
+                        help='Calculate the scattering disk size (deg)')
     group1.add_argument('--all', dest='do_all', action='store_true', default=False,
                         help='Include all parameters')
 
@@ -70,7 +72,7 @@ if __name__ == "__main__":
         log.setLevel(logging.DEBUG)
 
     if results.do_all:
-        results.halpha = results.sm = results.m = results.rms = results.xi = results.t0 = True
+        results.halpha = results.sm = results.m = results.rms = results.xi = results.t0 = results.theta = True
 
     # data is stored in the data dir, relative to *this* file
     datadir = os.path.join(os.path.dirname(__file__), 'data')
@@ -118,6 +120,10 @@ if __name__ == "__main__":
             val, err = sm.get_rms_var(pos)
             print("rms: ", val, "%/1year")
             print("err_rms: ", err, "%/1year")
+        if results.theta:
+            val, err = sm.get_theta(pos)
+            print("theta: ", val, "deg")
+            print("err_theta: ", err, "deg")
         sys.exit(0)
 
     if results.infile:
@@ -166,6 +172,10 @@ if __name__ == "__main__":
             val, err = sm.get_rms_var(pos)
             tab.add_column(Column(data=val, name='rms1yr'))
             tab.add_column(Column(data=err, name='err_rms1yr'))
+        if results.theta:
+            val, err = sm.get_theta(pos)
+            tab.add_column(Column(data=val, name='theta_r'))
+            tab.add_column(Column(data=err, name='err_theta_r'))
         print("Writing to {0}".format(results.outfile))
         tab.write(results.outfile, overwrite=True)
 
