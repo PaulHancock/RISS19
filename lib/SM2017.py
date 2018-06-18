@@ -43,9 +43,10 @@ class SM(object):
         self.c = c.value
         self.beta = 11/3
         self.re = 2.817e-15  # m
+        # From Narayan 1992 eq 2.2
         self.rf_1kpc = np.sqrt(self.c * self.kpc / (2*np.pi*self.nu))  # Fresnel scale assuming that D = 1kpc
         self.v = 1e4  # relative velocity of source/observer in m/s
-        self.log.debug("data:{0} err:{1}".format(ha_file,err_file))
+        self.log.debug("data:{0} err:{1}".format(ha_file, err_file))
         self.file = ha_file
         self.err_file = err_file
         self._load_file()
@@ -93,6 +94,31 @@ class SM(object):
         err_sm2= (err_iha/iha)*sm2
         return sm2, err_sm2
 
+    def get_rdiff(self, position):
+        """
+        Calculate the diffractive scale at the given sky coord
+        :param position: astropy.coordinates.SkyCoord
+        :return: parameter r_diff
+        """
+        sm2, err_sm2 = self.get_sm(position)
+        # r_diff as per Mcquart & Koay 2013, eq 7a.
+        rdiff = (2**(2-self.beta) * (np.pi * self.re**2 * (self.c/self.nu)**2 * self.beta) * sm2 * self.kpc *
+                 gamma(-self.beta/2)/gamma(self.beta/2))**(1/(2-self.beta))
+        err_rdiff = abs((1/(2-self.beta))*(err_sm2/sm2)*rdiff)
+        return rdiff, err_rdiff
+
+    def get_rref(self, position):
+        """
+        Calculate the refractive scale at the given sky coord
+        :param position: astropy.coordinates.SkyCoord
+        :return: parameter r_ref
+        """
+        # Narayan 1992 eq 4.2
+        rdiff, err_rdiff = self.get_rdiff(position)
+        rref = self.rf_1kpc**2 / rdiff
+        err_rref = (err_rdiff / rdiff) * rref
+        return rref, err_rref
+
     def get_xi(self, position):
         """
         calculate the parameter ξ for a given sky coord
@@ -100,12 +126,11 @@ class SM(object):
         :param position: astropy.coordinates.SkyCoord
         :return: parameter ξ
         """
-        sm2, err_sm2 = self.get_sm(position)
-        rdiff = (2**(2-self.beta) * (np.pi * self.re**2 * (self.c/self.nu)**2 * self.beta) * sm2 * self.kpc *
-                 gamma(-self.beta/2)/gamma(self.beta/2))**(1/(2-self.beta))
-        err_rdiff=abs((1/(2-self.beta))*(err_sm2/sm2)*rdiff)
+        rdiff, err_rdiff = self.get_rdiff(position)
+        # Narayan 1992, uses r_F/r_diff = \xi without explicitly stating that this is being done
+        # Compare Narayan 1992 eq 3.5 with Walker 1998 eq 6
         xi = self.rf_1kpc / rdiff
-        err_xi= (err_rdiff/rdiff)*xi
+        err_xi = (err_rdiff/rdiff)*xi
         return xi, err_xi
 
     def get_theta(self, position):
@@ -114,10 +139,10 @@ class SM(object):
         :param position: astropy.coordinates.SkyCoord
         :return:
         """
-        xi, err_xi = self.get_xi(position)
-        thetaF = self.rf_1kpc/self.kpc  # Fresnel scale in radians
-        theta = np.degrees(thetaF) * xi  # Walker 1998  eq 12
-        err_theta = np.degrees(thetaF) * err_xi
+        # See Narayan 1992 eq 4.10 and discussion immediately prior
+        r_ref, err_r_ref = self.get_rref(position)
+        theta = np.degrees(r_ref / (self.D*self.kpc))
+        err_theta = np.degrees(err_r_ref / (self.D*self.kpc))
         return theta, err_theta
 
     def get_m(self, position):
@@ -127,6 +152,7 @@ class SM(object):
         :return:
         """
         xi, err_xi = self.get_xi(position)
+        # Narayan 1992 eq 4.10 or Walker 1998 eq
         m = xi**(-1/3)
         err_m=(1/3)*(err_xi/xi)*m
         return m, err_m
@@ -169,6 +195,7 @@ def test_all_params():
     print("sm = {0}".format(sm.get_sm(pos)))
     print("t0 = {0}".format(sm.get_timescale(pos)))
     print("rms = {0}".format(sm.get_rms_var(pos)))
+    print("theta = {0}".format(sm.get_theta(pos)))
 
 
 def test_multi_pos():
@@ -181,6 +208,7 @@ def test_multi_pos():
     print("sm = {0}".format(sm.get_sm(pos)))
     print("t0 = {0}".format(sm.get_timescale(pos)))
     print("rms = {0}".format(sm.get_rms_var(pos)))
+    print("theta = {0}".format(sm.get_theta(pos)))
 
 
 if __name__ == "__main__":
