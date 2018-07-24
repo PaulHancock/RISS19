@@ -108,6 +108,18 @@ class SM(object):
         err_xi= (err_rdiff/rdiff)*xi
         return xi, err_xi
 
+    def get_theta(self, position):
+        """
+        calculate the size of the scattering disk for a given sky coord
+        :param position: astropy.coordinates.SkyCoord
+        :return:
+        """
+        xi, err_xi = self.get_xi(position)
+        thetaF = self.rf_1kpc/self.kpc  # Fresnel scale in radians
+        theta = np.degrees(thetaF) * xi  # Walker 1998  eq 12
+        err_theta = np.degrees(thetaF) * err_xi
+        return theta, err_theta
+
     def get_m(self, position):
         """
         calculate the modulation index using parameter ξ for a given sky coord
