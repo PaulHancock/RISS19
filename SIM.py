@@ -1,5 +1,4 @@
 from __future__ import print_function, division
-
 import os
 import datetime
 import healpy as hp
@@ -13,7 +12,7 @@ import astropy.units as u
 from lib.SM2017 import SM
 
 datadir = os.path.join(os.path.dirname(__file__), 'data')
-
+#region = cPickle.load(open(reg_file, 'rb'))
 SFG=0
 AGN=1
 stypes=[SFG, AGN]
@@ -70,7 +69,7 @@ def region_gen(num, reg_file):
                 reg_ind.append(i)
                 reg_ra.append(RA[i])
                 reg_dec.append(DEC[i])
-    return np.array(reg_ra), np.array(reg_dec)
+    return np.array(reg_ra), np.array(reg_dec), region.get_area(degrees=True)
 
 
 def flux_gen(region_arr, fdl, upp_lim):
@@ -85,7 +84,7 @@ def flux_gen(region_arr, fdl, upp_lim):
         flux_arr.append(np.random.uniform(low_lim, upp_lim))
     return flux_arr
 
-#def stype_gen(region_pos, soruce_size):
+# def stype_gen(region_pos, soruce_size):
 def stype_gen(arr):
     """
     Function to determine if a source is of type AGN or SFR
@@ -103,12 +102,12 @@ def ssize_gen(flux,stype):
     Output: Source size
     """
     arcsec=3600*180/np.pi
-    ssize_arr=[]
+    ssize_arr = []
     for i in range(0,len(stype)):
         if stype[i] == AGN:
-            ssize_arr.append(1/(arcsec*1000))
+            ssize_arr.append(1/(3600*1000))
         elif stype[i]== SFG:
-            ssize_arr.append((30/1000)/arcsec)
+            ssize_arr.append((30/(3600*1000)))
 
     return ssize_arr
 
@@ -120,57 +119,75 @@ def file_gen(ar1, ar2, ar3, ar4, ar5, output_name):
     """
     output_table= Table([ar1,ar2,ar3,ar4, ar5], names=('RA','DEC','Flux','stype', 'ssize'), meta={'name': output_name})
     output_table.write(output_name, overwrite=True)
-fdl=0.001
-upp_lim=10
-table_name='test.fits'
-RA,DEC= region_gen(1000,'testreg.mim')
-flux=flux_gen(RA,fdl,upp_lim)
-stype=stype_gen(RA)
-ssize=ssize_gen(flux,stype)
-file_gen(RA,DEC,flux,stype,ssize, table_name)
 
-frame = 'fk5'
-outfile='outtest.csv'
-file_name='testreg.mim'
-nu = 185*1e6
+fdl = 0.001
+upp_lim = 10
+table_name = 'test.fits'
+RA, DEC, area = region_gen(1000, 'testreg.mim')
+flux = flux_gen(RA,fdl,upp_lim)
+stype = stype_gen(RA)
+ssize = ssize_gen(flux,stype)
+file_gen(RA, DEC, flux, stype, ssize, table_name)
+ra, dec = RA, DEC
 
-tab = Table.read(table_name)
-ra,dec= RA,DEC
-# create the sky coordinate
-pos = SkyCoord(ra*u.degree, dec*u.degree, frame=frame)
-# make the SM object
-sm = SM(ha_file=os.path.join(datadir, 'Halpha_map.fits'),
+output_file = 'outtest.csv'
+file_name = 'testreg.mim'
+s_type = stype
+s_size = ssize
+
+def output_gen(input_table, output_file):
+
+
+    nu = 185*1e6
+    frame = 'fk5'
+    tab = Table.read(input_table)
+
+    # create the sky coordinate
+    pos = SkyCoord(ra*u.degree, dec*u.degree, frame=frame)
+    # make the SM object
+    sm = SM(ha_file=os.path.join(datadir, 'Halpha_map.fits'),
         err_file=os.path.join(datadir, 'Halpha_error.fits'),
         nu=nu)
-#halpha
-val, err = sm.get_halpha(pos)
-tab.add_column(Column(data=val, name='Halpha'))
-tab.add_column(Column(data=err, name='err_Halpha'))
-#xi
-val, err = sm.get_xi(pos)
-tab.add_column(Column(data=val, name='xi'))
-tab.add_column(Column(data=err, name='err_xi'))
-#sm
-val, err = sm.get_sm(pos)
-tab.add_column(Column(data=val, name='sm'))
-tab.add_column(Column(data=err, name='err_sm'))
-#mod
+    # halpha
+    val, err = sm.get_halpha(pos)
+    tab.add_column(Column(data=val, name='Halpha'))
+    tab.add_column(Column(data=err, name='err_Halpha'))
+    # xi
+    val, err = sm.get_xi(pos)
+    tab.add_column(Column(data=val, name='xi'))
+    tab.add_column(Column(data=err, name='err_xi'))
+    # sm
+    val, err = sm.get_sm(pos)
+    tab.add_column(Column(data=val, name='sm'))
+    tab.add_column(Column(data=err, name='err_sm'))
+    # mod
+    val, err = sm.get_m(pos,s_type,s_size)
+    tab.add_column(Column(data=val, name='m'))
+    tab.add_column(Column(data=err, name='err_m'))
+    # t0
+    val, err = sm.get_timescale(pos)
+    tab.add_column(Column(data=val, name='t0'))
+    tab.add_column(Column(data=err, name='err_t0'))
+    # rms
+    val, err = sm.get_rms_var(pos,s_type,s_size)
+    tab.add_column(Column(data=val, name='rms1yr'))
+    tab.add_column(Column(data=err, name='err_rms1yr'))
+    # theta
+    val, err = sm.get_theta(pos)
+    tab.add_column(Column(data=val, name='theta_r'))
+    tab.add_column(Column(data=err, name='err_theta_r'))
+    tab.write(output_file, overwrite=True)
+    return tab['m']
 
-val, err = sm.get_m(pos)
-tab.add_column(Column(data=val, name='m'))
-tab.add_column(Column(data=err, name='err_m'))
-#t0
-val, err = sm.get_timescale(pos)
-tab.add_column(Column(data=val, name='t0'))
-tab.add_column(Column(data=err, name='err_t0'))
-#rms
-val, err = sm.get_rms_var(pos)
-tab.add_column(Column(data=val, name='rms1yr'))
-tab.add_column(Column(data=err, name='err_rms1yr'))
-#theta
-val, err = sm.get_theta(pos)
-tab.add_column(Column(data=val, name='theta_r'))
-tab.add_column(Column(data=err, name='err_theta_r'))
-tab.write(outfile, overwrite=True)
+
+mod = output_gen(table_name,output_file)
+mcount = 0
+var = []
+for i in range(0,len(mod)):
+    if mod[i] >= 0.05:
+        mcount = mcount+1
+        var.append(mod[i])
+print (var)
+print (mcount, len(mod)-len(var), mcount/area)
 
 
