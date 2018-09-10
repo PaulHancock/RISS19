@@ -19,6 +19,8 @@ from scipy.special import gamma
 
 __author__ = 'Paul Hancock'
 __date__ = '2017-02-23'
+SFG=0
+AGN=1
 
 seconds_per_year = 3600 * 24 * 365.25
 
@@ -126,14 +128,15 @@ class SM(object):
         :param position: astropy.coordinates.SkyCoord
         :return:
         """
-	xi, err_xi = self.get_xi(position)
-	theta,err_theta=self.get_theta(position)
-	if s_type == 1:
-        	m = xi**(-1/3)
-        	err_m=(1/3)*(err_xi/xi)*m
-	else:
-		m = (xi**(-1/3))*(theta/s_size)**(7/6)
-        	err_m=((1/3)*(err_xi/xi)*(7/6)*(err_theta/theta))*m
+        xi, err_xi = self.get_xi(position)
+
+        if s_type == AGN:
+                m = xi**(-1/3)
+                err_m=(1/3)*(err_xi/xi)*m
+        else:
+            theta, err_theta = self.get_theta(position)
+            m = (xi**(-1/3))*(theta/s_size)**(7/6)
+                err_m=((1/3)*(err_xi/xi)*(7/6)*(err_theta/theta))*m
         return m, err_m
 
     def get_timescale(self, position):
