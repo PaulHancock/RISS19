@@ -120,7 +120,7 @@ class SM(object):
         err_theta = np.degrees(thetaF) * err_xi
         return theta, err_theta
 
-    def get_m(self, position):
+    def get_mp(self, position):
         """
         calculate the modulation index using parameter ξ for a given sky coord
         :param position: astropy.coordinates.SkyCoord
@@ -129,6 +129,17 @@ class SM(object):
         xi, err_xi = self.get_xi(position)
         m = xi**(-1/3)
         err_m=(1/3)*(err_xi/xi)*m
+        return m, err_m
+
+    def get_me(self, position):
+        """
+        calculate the modulation index using parameter ξ for a given sky coord
+        :param position: astropy.coordinates.SkyCoord
+        :return:
+        """
+        xi, err_xi = self.get_xi(position)
+        m = xi ** (-1 / 3)
+        err_m = (1 / 3) * (err_xi / xi) * m
         return m, err_m
 
     def get_timescale(self, position):
@@ -152,7 +163,7 @@ class SM(object):
         :return:
         """
         tref, err_tref=self.get_timescale(position)
-        m, err_m= self.get_m(position)
+        m, err_m= self.get_mp(position)
         #basic uncertainty propagation, can probably change.
         t =m/tref * nyears
         err_t=((err_m/m)+(err_tref/tref))*t
@@ -165,7 +176,7 @@ def test_all_params():
     pos = SkyCoord([0], [0], unit=(u.hour, u.degree))
     print("Hα = {0}".format(sm.get_halpha(pos)))
     print("ξ = {0}".format(sm.get_xi(pos)))
-    print("m = {0}".format(sm.get_m(pos)))
+    print("mp = {0}".format(sm.get_mp(pos)))
     print("sm = {0}".format(sm.get_sm(pos)))
     print("t0 = {0}".format(sm.get_timescale(pos)))
     print("rms = {0}".format(sm.get_rms_var(pos)))
@@ -177,7 +188,7 @@ def test_multi_pos():
     pos = SkyCoord([0, 4, 8, 12, 16, 20]*u.hour, [-90, -45, 0, 45, 90, -26]*u.degree)
     print("Hα = {0}".format(sm.get_halpha(pos)))
     print("ξ = {0}".format(sm.get_xi(pos)))
-    print("m = {0}".format(sm.get_m(pos)))
+    print("mp = {0}".format(sm.get_mp(pos)))
     print("sm = {0}".format(sm.get_sm(pos)))
     print("t0 = {0}".format(sm.get_timescale(pos)))
     print("rms = {0}".format(sm.get_rms_var(pos)))
