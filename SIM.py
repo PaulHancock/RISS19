@@ -278,7 +278,7 @@ if __name__ == "__main__":
                         help='Flux lower limit')
     group1.add_argument('-mc', '--mod_cutoff',  action='store_const', default=0.05,
                         help='Calculate modulation index (fraction)')
-    group1.add_argument('-reg','--region_name', default=None, action='store_true',
+    group1.add_argument('-reg','--region_name', default='testreg.mim', action='store_true',
                         help='input region file')
 test()
 #if __name__ == "__main__":

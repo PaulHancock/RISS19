@@ -122,7 +122,7 @@ class SM(object):
         err_theta = np.degrees(thetaF) * err_xi
         return theta, err_theta
 
-    def get_m(self, position):
+    def get_m(self, position,stype,ssize):
         """
         calculate the modulation index using parameter ξ for a given sky coord
         :param position: astropy.coordinates.SkyCoord
@@ -130,13 +130,13 @@ class SM(object):
         """
         xi, err_xi = self.get_xi(position)
 
-        if s_type == AGN:
-                m = xi**(-1/3)
-                err_m=(1/3)*(err_xi/xi)*m
+        if stype == AGN:
+            m = xi**(-1/3)
+            err_m=(1/3)*(err_xi/xi)*m
         else:
             theta, err_theta = self.get_theta(position)
-            m = (xi**(-1/3))*(theta/s_size)**(7/6)
-                err_m=((1/3)*(err_xi/xi)*(7/6)*(err_theta/theta))*m
+            m = (xi**(-1/3))*(theta/ssize)**(7/6)
+            err_m=((1/3)*(err_xi/xi)*(7/6)*(err_theta/theta))*m
         return m, err_m
 
     def get_timescale(self, position):
@@ -151,7 +151,7 @@ class SM(object):
         err_tref=(err_xi/xi)*tref
         return tref, err_tref
 
-    def get_rms_var(self, position,s_type,s_size, nyears=1):
+    def get_rms_var(self, position,stype,ssize, nyears=1):
         """
         calculate the expected RMS variation in nyears at a given sky coord
         rms variability is fraction/year
@@ -160,7 +160,7 @@ class SM(object):
         :return:
         """
         tref, err_tref=self.get_timescale(position)
-        m, err_m= self.get_m(position,s_type,s_size)
+        m, err_m= self.get_m(position,stype,ssize)
         #basic uncertainty propagation, can probably change.
         t =m/tref * nyears
         err_t=((err_m/m)+(err_tref/tref))*t
@@ -173,10 +173,10 @@ def test_all_params():
     pos = SkyCoord([0], [0], unit=(u.hour, u.degree))
     print("Hα = {0}".format(sm.get_halpha(pos)))
     print("ξ = {0}".format(sm.get_xi(pos)))
-    print("m = {0}".format(sm.get_m(pos,s_type,s_size)))
+    print("m = {0}".format(sm.get_m(pos,stype,ssize)))
     print("sm = {0}".format(sm.get_sm(pos)))
     print("t0 = {0}".format(sm.get_timescale(pos)))
-    print("rms = {0}".format(sm.get_rms_var(pos,s_type,s_size)))
+    print("rms = {0}".format(sm.get_rms_var(pos,stype,ssize)))
 
 
 def test_multi_pos():
@@ -185,10 +185,10 @@ def test_multi_pos():
     pos = SkyCoord([0, 4, 8, 12, 16, 20]*u.hour, [-90, -45, 0, 45, 90, -26]*u.degree)
     print("Hα = {0}".format(sm.get_halpha(pos)))
     print("ξ = {0}".format(sm.get_xi(pos)))
-    print("m = {0}".format(sm.get_m(pos,s_type,s_size)))
+    print("m = {0}".format(sm.get_m(pos,stype,ssize)))
     print("sm = {0}".format(sm.get_sm(pos)))
     print("t0 = {0}".format(sm.get_timescale(pos)))
-    print("rms = {0}".format(sm.get_rms_var(pos,s_type,s_size)))
+    print("rms = {0}".format(sm.get_rms_var(pos,stype,ssize)))
 
 
 
