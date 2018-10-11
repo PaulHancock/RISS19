@@ -47,7 +47,7 @@ class SM(object):
         self.re = 2.817e-15  # m
         self.rf_1kpc = np.sqrt(self.c * self.kpc / (2*np.pi*self.nu))  # Fresnel scale assuming that D = 1kpc
         self.v = 1e4  # relative velocity of source/observer in m/s
-        self.log.debug("data:{0} err:{1}".format(ha_file,err_file))
+        #self.log.debug("data:{0} err:{1}".format(ha_file,err_file))
         self.file = ha_file
         self.err_file = err_file
         self._load_file()
@@ -191,6 +191,5 @@ def test_multi_pos():
     print("rms = {0}".format(sm.get_rms_var(pos,s_type,s_size)))
 
 
-if __name__ == "__main__":
-    test_all_params()
+
     test_multi_pos()
