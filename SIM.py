@@ -19,28 +19,14 @@ AGN=1
 stypes=[SFG, AGN]
 sprobs=[0.5, 0.5]
 
-###################
-# INPUT VARIABLES #
-###################
-"""
-Variables I want to be able to be read in from the user but havent fixed yet
-placeholders below
-"""
-mod_cutoff=0.05
-#tscale_cutoff=??
-low_Flim=0.001  #Jy
-upp_Flim=1.0    #Jy
-table_name='test.fits' #Name of table you want to write to (FILE GEN)
-output_name = 'outtest.csv' #Name of outfile (OUTPUT GEN)
-#Above Table/Output could be same? Think I chose differently as to not overwrite, can double check later
-region_name = 'testreg.mim' #Region file name
-region = cPickle.load(open(region_name, 'rb'))
-area=region.get_area(degrees=True)
-obs_time=30.*24.*60.*60.
-############################################
+
+
+
+
 
 class SIM(object):
     def __init__(self, log=None):
+
 
         if log is None:
             logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
@@ -50,16 +36,16 @@ class SIM(object):
             self.log=log
         #Variables
         self.nu = 185 * 1e6
-        self.mod_cutoff = 0.05
-        self.low_Flim = 0.001  # Jy
-        self.upp_Flim = 1.0  # Jy
+        #self.mod_cutoff = mc
+        #self.low_Flim = FLL  # Jy
+        #self.upp_Flim = FUL  # Jy
         self.table_name = 'test.fits'  # Name of table you want to write to (FILE GEN)
         self.output_name = 'outtest.csv'  # Name of outfile (OUTPUT GEN)
         # Above Table/Output could be same? Think I chose differently as to not overwrite, can double check later
-        self.region_name = 'testreg.mim'  # Region file name
+        region=cPickle.load(open(self.region_name, 'rb'))
         self.area = region.get_area(degrees=True)
         self.obs_time = 600. * 24. * 60. * 60.
-        self.loops=10
+        self.loops=20
         self.num_scale=40
 
     def flux_gen(self):
@@ -243,7 +229,7 @@ class SIM(object):
         val, err = sm.get_theta(pos)
         tab.add_column(Column(data=val, name='theta_r'))
         tab.add_column(Column(data=err, name='err_theta_r'))
-        tab.write(self.output_name, overwrite=True)
+        #tab.write(self.output_name, overwrite=True)
         return tab['m'], tab['t0']
 
     def areal_gen(self):
@@ -263,7 +249,7 @@ class SIM(object):
                 mcount = mcount + 1
                 var.append(mod[i])
         areal = mcount / self.area
-        return areal, mod, var, len(flux), len(RA)
+        return areal, mod, var, RA, DEC, flux, stype, ssize
 
     def repeat(self):
         areal_arr = []
@@ -284,4 +270,17 @@ def test():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    test()
+
+    group1 = parser.add_argument_group('Input Variables')
+    group1.add_argument('-FUL', '--upp_Flim',  action='store_const', default=1.0,
+                        help='Flux upper limit')
+    group1.add_argument('-FLL', '--low_Flim',  action='store_const', default=0.01,
+                        help='Flux lower limit')
+    group1.add_argument('-mc', '--mod_cutoff',  action='store_const', default=0.05,
+                        help='Calculate modulation index (fraction)')
+    group1.add_argument('-reg','--region_name', default=None, action='store_true',
+                        help='input region file')
+test()
+#if __name__ == "__main__":
+#    parser = argparse.ArgumentParser()
+#   test()
