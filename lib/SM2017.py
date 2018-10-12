@@ -130,13 +130,13 @@ class SM(object):
         """
         xi, err_xi = self.get_xi(position)
 
-        if stype == AGN:
-            m = xi**(-1/3)
-            err_m=(1/3)*(err_xi/xi)*m
-        else:
-            theta, err_theta = self.get_theta(position)
-            m = (xi**(-1/3))*(theta/ssize)**(7/6)
-            err_m=((1/3)*(err_xi/xi)*(7/6)*(err_theta/theta))*m
+        #if stype == AGN:
+        #    m = xi**(-1/3)
+        #    err_m=(1/3)*(err_xi/xi)*m
+        #else:
+        theta, err_theta = self.get_theta(position)
+        m = (xi**(-1./3.))*(theta/ssize)**(7./6.)
+        err_m=((1./3.)*(err_xi/xi)*(7./6.)*(err_theta/theta))*m
         return m, err_m
 
     def get_timescale(self, position):
