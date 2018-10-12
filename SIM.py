@@ -22,17 +22,23 @@ sprobs=[0.5, 0.5]
 parser = argparse.ArgumentParser()
 
 parser.add_argument('-FUL', action='store', dest='FUL', default=1.,
-                    help='Store upper flux limit')
+                    help='Store upper flux limit (Jy)')
 parser.add_argument('-FLL', action='store', dest='FLL', default=0.001,
-                    help='Store lower flux limit')
+                    help='Store lower flux limit (Jy)')
 parser.add_argument('-mc', action='store', dest='mc', default=0.05,
                     help='Store modulation cut off value')
+parser.add_argument('-t', action='store', dest='obs_time', default=300,
+                    help='observation time in days')
+parser.add_argument('-i', action='store', dest='loops', default=20,
+                    help='Number of iterations to run program through (30+ recommended)')
 parser.add_argument('-reg', action='store', dest='region_name',
                     help='read in region file')
+parser.add_argument('--out', dest='outfile', default=None, type=str,
+                        help="Table of results")
 parser.add_argument('--version', action='version', version='%(prog)s 1.0')
 
 results = parser.parse_args()
-
+outfile=results.outfile
 class SIM(object):
     def __init__(self, log=None):
 
@@ -49,13 +55,12 @@ class SIM(object):
         self.mod_cutoff = np.float(results.mc)
         self.low_Flim = np.float(results.FLL)  # Jy
         self.upp_Flim = np.float(results.FUL) # Jy
-        self.table_name = 'test.fits'  # Name of table you want to write to (FILE GEN)
         self.region_name = results.region_name
         #self.region_name=('testreg.mim')
         region=cPickle.load(open(self.region_name, 'rb'))
         self.area = region.get_area(degrees=True)
-        self.obs_time = 600. * 24. * 60. * 60.
-        self.loops=20
+        self.obs_time = np.float(results.obs_time) * 24. * 60. * 60.
+        self.loops=np.int(results.loops)
         self.num_scale=40
 
     def flux_gen(self):
@@ -203,7 +208,7 @@ class SIM(object):
     def output_gen(self, ra, dec, stype, ssize):
         nu = self.nu
         frame = 'fk5'
-        tab = Table.read(self.table_name)
+        tab = Table()
 
         # create the sky coordinate
         pos = SkyCoord(ra * u.degree, dec * u.degree, frame=frame)
@@ -244,14 +249,14 @@ class SIM(object):
 
     def areal_gen(self):
         flux, num = self.flux_gen()
-        print('flux')
+        #print('flux')
         RA, DEC = self.region_gen(self.region_name)
-        print('RA')
+        #print('RA')
         stype = self.stype_gen(RA)
         ssize = self.ssize_gen(flux, stype)
-        print('SS')
+        #print('SS')
         mod, t0 = self.output_gen(RA, DEC, stype, ssize)
-        print('mod')
+        #print('mod')
         obs_yrs = self.obs_time / (3600. * 24. * 365.25)
         mcount = 0
         var = []
@@ -263,26 +268,40 @@ class SIM(object):
                 mcount = mcount + 1
                 var.append(mod[i])
         areal = mcount / self.area
-        print('area')
+        #print('area')
         return areal, mod, var, RA, DEC, flux, stype, ssize
 
     def repeat(self):
         areal_arr = []
+        NSources=[]
         count=0
         for i in range(0, self.loops):
-            areal_arr.append(self.areal_gen()[0])
+            INPUT = self.areal_gen()
+            areal_arr.append(INPUT[0])
             count=count+1
+            NSources.append(len(INPUT[1]))
+
         avg_areal = np.mean(areal_arr)
-        return np.array(areal_arr), avg_areal, count
+        return np.array(areal_arr), avg_areal, count, np.array(NSources), self.area, self.low_Flim, self.upp_Flim
 
 
 def test():
     sim=SIM()
     results=sim.repeat()
+    outtab=Table()
+    msd = np.std(results[0])
+    #print(results[1], msd, np.mean(results[3]) , results[4], results[5], results[6], results[2])
+    Names=np.array(['Areal Sky Density', 'Stand Dev ASD', 'Number of sources', 'Area (deg^2)', 'Lower Flux Limit (Jy)',
+                    'Upper Flux Limit (Jy)', 'Iterations'])
+    Values=np.array([results[1], msd, np.mean(results[3]) , results[4], results[5], results[6], results[2],"","",""])
+    #print(len(Names), len(Values))
+    outtab.add_column(Column(data=results[0], name='Modulation'))
+    outtab.add_column(Column(data=Names, name='Parameters'))
+    outtab.add_column(Column(data=Values, name='Values'))
+    outtab.write(outfile, overwrite=True)
     print("Array: {0}".format(results[0]))
     print("Avg Areal: {0}".format(results[1]))
     print("Loops: {0}".format(results[2]))
 
 
-                        
 test()
