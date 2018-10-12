@@ -46,9 +46,9 @@ class SIM(object):
         #Variables
         self.nu = 185 * 1e6
         self.arcsec = np.pi / (180. * 3600.)
-        self.mod_cutoff = results.mc
-        self.low_Flim = results.FLL  # Jy
-        self.upp_Flim = results.FUL  # Jy
+        self.mod_cutoff = np.float(results.mc)
+        self.low_Flim = np.float(results.FLL)  # Jy
+        self.upp_Flim = np.float(results.FUL) # Jy
         self.table_name = 'test.fits'  # Name of table you want to write to (FILE GEN)
         self.region_name = results.region_name
         #self.region_name=('testreg.mim')
@@ -184,9 +184,9 @@ class SIM(object):
         ssize_arr = []
         for i in range(0, len(stype)):
             if stype[i] == AGN:
-                ssize_arr.append(0.25/(3600.*1000.))
+                ssize_arr.append(0.25/(3600.*1000.)) #(0.0979/(3600.)) actual values
             elif stype[i] == SFG:
-                ssize_arr.append(30./(3600.*1000.))
+                ssize_arr.append(30./(3600.*1000.)) #(0.2063/(3600.)) actual values
 
         return ssize_arr
 
@@ -244,10 +244,14 @@ class SIM(object):
 
     def areal_gen(self):
         flux, num = self.flux_gen()
+        print('flux')
         RA, DEC = self.region_gen(self.region_name)
+        print('RA')
         stype = self.stype_gen(RA)
         ssize = self.ssize_gen(flux, stype)
+        print('SS')
         mod, t0 = self.output_gen(RA, DEC, stype, ssize)
+        print('mod')
         obs_yrs = self.obs_time / (3600. * 24. * 365.25)
         mcount = 0
         var = []
@@ -259,6 +263,7 @@ class SIM(object):
                 mcount = mcount + 1
                 var.append(mod[i])
         areal = mcount / self.area
+        print('area')
         return areal, mod, var, RA, DEC, flux, stype, ssize
 
     def repeat(self):
