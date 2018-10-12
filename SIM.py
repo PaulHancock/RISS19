@@ -19,10 +19,19 @@ AGN=1
 stypes=[SFG, AGN]
 sprobs=[0.5, 0.5]
 
+parser = argparse.ArgumentParser()
 
+parser.add_argument('-FUL', action='store', dest='FUL', default=1.,
+                    help='Store upper flux limit')
+parser.add_argument('-FLL', action='store', dest='FLL', default=0.001,
+                    help='Store lower flux limit')
+parser.add_argument('-mc', action='store', dest='mc', default=0.05,
+                    help='Store modulation cut off value')
+parser.add_argument('-reg', action='store', dest='region_name',
+                    help='read in region file')
+parser.add_argument('--version', action='version', version='%(prog)s 1.0')
 
-
-
+results = parser.parse_args()
 
 class SIM(object):
     def __init__(self, log=None):
@@ -36,12 +45,13 @@ class SIM(object):
             self.log=log
         #Variables
         self.nu = 185 * 1e6
-        #self.mod_cutoff = mc
-        #self.low_Flim = FLL  # Jy
-        #self.upp_Flim = FUL  # Jy
+        self.arcsec = np.pi / (180. * 3600.)
+        self.mod_cutoff = results.mc
+        self.low_Flim = results.FLL  # Jy
+        self.upp_Flim = results.FUL  # Jy
         self.table_name = 'test.fits'  # Name of table you want to write to (FILE GEN)
-        self.output_name = 'outtest.csv'  # Name of outfile (OUTPUT GEN)
-        # Above Table/Output could be same? Think I chose differently as to not overwrite, can double check later
+        self.region_name = results.region_name
+        #self.region_name=('testreg.mim')
         region=cPickle.load(open(self.region_name, 'rb'))
         self.area = region.get_area(degrees=True)
         self.obs_time = 600. * 24. * 60. * 60.
@@ -170,13 +180,13 @@ class SIM(object):
         Input: Flux and source type
         Output: Source size
         """
-        arcsec = 3600 * 180 / np.pi
+
         ssize_arr = []
         for i in range(0, len(stype)):
             if stype[i] == AGN:
-                ssize_arr.append(1 / (3600 * 1000))
+                ssize_arr.append(0.25/(3600.*1000.))
             elif stype[i] == SFG:
-                ssize_arr.append((30 / (3600 * 1000)))
+                ssize_arr.append(30./(3600.*1000.))
 
         return ssize_arr
 
@@ -268,19 +278,6 @@ def test():
     print("Avg Areal: {0}".format(results[1]))
     print("Loops: {0}".format(results[2]))
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
 
-    group1 = parser.add_argument_group('Input Variables')
-    group1.add_argument('-FUL', '--upp_Flim',  action='store_const', default=1.0,
-                        help='Flux upper limit')
-    group1.add_argument('-FLL', '--low_Flim',  action='store_const', default=0.01,
-                        help='Flux lower limit')
-    group1.add_argument('-mc', '--mod_cutoff',  action='store_const', default=0.05,
-                        help='Calculate modulation index (fraction)')
-    group1.add_argument('-reg','--region_name', default='testreg.mim', action='store_true',
-                        help='input region file')
+                        
 test()
-#if __name__ == "__main__":
-#    parser = argparse.ArgumentParser()
-#   test()
