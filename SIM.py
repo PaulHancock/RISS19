@@ -29,11 +29,13 @@ parser.add_argument('-mc', action='store', dest='mc', default=0.05,
                     help='Store modulation cut off value')
 parser.add_argument('-t', action='store', dest='obs_time', default=300,
                     help='observation time in days')
+parser.add_argument('-f', action='store', dest='nu', default=185.,
+                    help='Frequency in MHz')
 parser.add_argument('-i', action='store', dest='loops', default=20,
                     help='Number of iterations to run program through (30+ recommended)')
 parser.add_argument('-reg', action='store', dest='region_name',
                     help='read in region file')
-parser.add_argument('--out', dest='outfile', default=None, type=str,
+parser.add_argument('--out', dest='outfile', default=False, type=str,
                         help="Table of results")
 parser.add_argument('--version', action='version', version='%(prog)s 1.0')
 
@@ -50,7 +52,7 @@ class SIM(object):
         else:
             self.log=log
         #Variables
-        self.nu = 185 * 1e6
+        self.nu = np.float(results.nu) * 1e6
         self.arcsec = np.pi / (180. * 3600.)
         self.mod_cutoff = np.float(results.mc)
         self.low_Flim = np.float(results.FLL)  # Jy
@@ -87,26 +89,26 @@ class SIM(object):
             Ni = np.array(Ni)
             mpoint = np.array(mpoint)
             dS = np.array(dS)
-            S = Ni / dS  # * mpoint**2.5
-            return bins, S, mpoint, Ni, dS
+            dNdS= Ni / dS  # * mpoint**2.5
+            return bins, dNdS, mpoint, Ni, dS
 
-        a = 3900
-        x1, y1, mp = diff_counts(a, 1.6, -4., 0.)[0:3]
-        x = mp
-        y = y1 * mp ** 2.5
-        p = np.polyfit(x, y, 1)
+        a = 3900.
+        bins, _, mpoint, Ni, _= diff_counts(a, 1.6, -4., 0.)
+        x = mpoint
+        y = Ni #* mp ** 2.5
+        p = np.polyfit(np.log10(x), np.log10(y), 1)
         q = np.poly1d(p)
 
+        divisions=10
+        flux = np.logspace(np.log10(low), np.log10(upp), num=divisions)
+        numS = 10**(q(flux))
 
-        flux = np.logspace(np.log10(low), np.log10(upp), num=10)
-        numS = q(flux)
         FLUX = []
         Area = self.area * (np.pi ** 2.) / (180 ** 2.)
         for i in range(0, len(flux) - 1):
-            rang = np.arange(flux[i], flux[i + 1], (flux[i + 1] - flux[i]) / 10., dtype=float)
-            run = np.int((numS[i + 1] - numS[i]) * Area)
-            for j in range(0, run):
-                FLUX.append(np.random.choice(rang))
+            rang = np.arange(flux[i], flux[i + 1], abs(flux[i + 1] - flux[i]) / np.float(divisions), dtype=float)
+            run = np.int(abs((numS[i + 1] - numS[i])) * Area)
+            FLUX.extend(np.random.choice(rang, size=run)) #MAKE THIS FASTER
         flux_arr = np.random.permutation(np.array(FLUX))
 
         return flux_arr, len(flux_arr)
@@ -249,7 +251,7 @@ class SIM(object):
 
     def areal_gen(self):
         flux, num = self.flux_gen()
-        #print('flux')
+        #print('flux', flux, num)
         RA, DEC = self.region_gen(self.region_name)
         #print('RA')
         stype = self.stype_gen(RA)
@@ -267,6 +269,7 @@ class SIM(object):
             if mod[i] >= self.mod_cutoff:
                 mcount = mcount + 1
                 var.append(mod[i])
+        #t_mean=np.mean(t0)
         areal = mcount / self.area
         #print('area')
         return areal, mod, var, RA, DEC, flux, stype, ssize
@@ -282,7 +285,7 @@ class SIM(object):
             NSources.append(len(INPUT[1]))
 
         avg_areal = np.mean(areal_arr)
-        return np.array(areal_arr), avg_areal, count, np.array(NSources), self.area, self.low_Flim, self.upp_Flim
+        return np.array(areal_arr), avg_areal, count, np.array(NSources), self.area, self.low_Flim, self.upp_Flim, self.obs_time
 
 
 def test():
@@ -290,18 +293,27 @@ def test():
     results=sim.repeat()
     outtab=Table()
     msd = np.std(results[0])
-    #print(results[1], msd, np.mean(results[3]) , results[4], results[5], results[6], results[2])
-    Names=np.array(['Areal Sky Density', 'Stand Dev ASD', 'Number of sources', 'Area (deg^2)', 'Lower Flux Limit (Jy)',
-                    'Upper Flux Limit (Jy)', 'Iterations'])
-    Values=np.array([results[1], msd, np.mean(results[3]) , results[4], results[5], results[6], results[2],"","",""])
-    #print(len(Names), len(Values))
-    outtab.add_column(Column(data=results[0], name='Modulation'))
-    outtab.add_column(Column(data=Names, name='Parameters'))
-    outtab.add_column(Column(data=Values, name='Values'))
-    outtab.write(outfile, overwrite=True)
+    if outfile!= False:
+        #print(results[1], msd, np.mean(results[3]) , results[4], results[5], results[6], results[2])
+
+        Names=np.array(['Areal Sky Density', 'Stand Dev ASD', 'Number of sources', 'Area (deg^2)', 'Lower Flux Limit (Jy)',
+                        'Upper Flux Limit (Jy)', 'Observation Time','Iterations'])
+        Values = np.array([results[1], msd, np.mean(results[3]), results[4], results[5], results[6],  results[7],results[2]])
+        diff = np.empty(len(results[0]) - len(Names))
+        diff[:]=None
+        #print(diff)
+        #print(len(Names), len(Values), len(results[0]))
+        Names=np.append(Names,diff)
+        Values=np.append(Values,diff)
+        #print(len(Names), len(Values), len(results[0]))
+        outtab.add_column(Column(data=results[0], name='Modulation'))
+        outtab.add_column(Column(data=Names, length= len(results[0]), name='Parameters'))
+        outtab.add_column(Column(data=Values, length= len(results[0]), name='Values'))
+        outtab.write(outfile, overwrite=True)
     print("Array: {0}".format(results[0]))
     print("Avg Areal: {0}".format(results[1]))
     print("Loops: {0}".format(results[2]))
+    print("Num Sources: {0}".format(np.mean(results[3])))
 
 
 test()
