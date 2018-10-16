@@ -27,7 +27,7 @@ parser.add_argument('-FLL', action='store', dest='FLL', default=0.001,
                     help='Store lower flux limit (Jy)')
 parser.add_argument('-mc', action='store', dest='mc', default=0.05,
                     help='Store modulation cut off value')
-parser.add_argument('-t', action='store', dest='obs_time', default=300,
+parser.add_argument('-t', action='store', dest='obs_time', default=183,
                     help='observation time in days')
 parser.add_argument('-f', action='store', dest='nu', default=185.,
                     help='Frequency in MHz')
@@ -78,7 +78,7 @@ class SIM(object):
             return output
 
         def diff_counts(a, b, low, upp):
-            bins = np.logspace(low, upp)
+            bins = np.logspace(np.log10(low), np.log10(upp), num=100)
             Ni = []
             mpoint = []
             dS = []
@@ -93,23 +93,15 @@ class SIM(object):
             return bins, dNdS, mpoint, Ni, dS
 
         a = 3900.
-        bins, _, mpoint, Ni, _= diff_counts(a, 1.6, -4., 0.)
-        x = mpoint
-        y = Ni #* mp ** 2.5
-        p = np.polyfit(np.log10(x), np.log10(y), 1)
-        q = np.poly1d(p)
-
-        divisions=10
-        flux = np.logspace(np.log10(low), np.log10(upp), num=divisions)
-        numS = 10**(q(flux))
-
+        bins, dnds,mid,Ni,width=diff_counts(a,1.6,low,upp)
         FLUX = []
         Area = self.area * (np.pi ** 2.) / (180 ** 2.)
-        for i in range(0, len(flux) - 1):
-            rang = np.arange(flux[i], flux[i + 1], abs(flux[i + 1] - flux[i]) / np.float(divisions), dtype=float)
-            run = np.int(abs((numS[i + 1] - numS[i])) * Area)
-            FLUX.extend(np.random.choice(rang, size=run)) #MAKE THIS FASTER
+
+        for i in range(0, len(bins) - 1):
+            rang = np.arange(bins[i], bins[i]+width[i], width[i]/Ni[i], dtype=float)
+            FLUX.extend(np.random.choice(rang, size=int(Ni[i]*Area)))
         flux_arr = np.random.permutation(np.array(FLUX))
+
 
         return flux_arr, len(flux_arr)
 
@@ -247,7 +239,7 @@ class SIM(object):
         tab.add_column(Column(data=val, name='theta_r'))
         tab.add_column(Column(data=err, name='err_theta_r'))
         #tab.write(self.output_name, overwrite=True)
-        return tab['m'], tab['t0']
+        return tab['m'], tab['t0'], tab['Halpha'], tab['theta_r']
 
     def areal_gen(self):
         flux, num = self.flux_gen()
@@ -257,7 +249,7 @@ class SIM(object):
         stype = self.stype_gen(RA)
         ssize = self.ssize_gen(flux, stype)
         #print('SS')
-        mod, t0 = self.output_gen(RA, DEC, stype, ssize)
+        mod, t0, Ha, theta= self.output_gen(RA, DEC, stype, ssize)
         #print('mod')
         obs_yrs = self.obs_time / (3600. * 24. * 365.25)
         mcount = 0
@@ -269,51 +261,76 @@ class SIM(object):
             if mod[i] >= self.mod_cutoff:
                 mcount = mcount + 1
                 var.append(mod[i])
-        #t_mean=np.mean(t0)
+
         areal = mcount / self.area
-        #print('area')
-        return areal, mod, var, RA, DEC, flux, stype, ssize
+
+        return areal, mod, t0, Ha, theta
 
     def repeat(self):
         areal_arr = []
+        mod_arr=np.empty((self.loops,2))
+        t0_arr=np.empty((self.loops,2))
+        Ha_arr=np.empty((self.loops,2))
+        theta_arr=np.empty((self.loops,2))
         NSources=[]
         count=0
+
         for i in range(0, self.loops):
             INPUT = self.areal_gen()
             areal_arr.append(INPUT[0])
+            mod_arr[i,:]=[np.mean(INPUT[1]), np.std(INPUT[1])]
+            t0_arr[i,:]=[np.mean(INPUT[2]), np.std(INPUT[2])]
+            Ha_arr[i,:]=[np.mean(INPUT[3]), np.std(INPUT[3])]
+            theta_arr[i,:]=[np.mean(INPUT[4]), np.std(INPUT[4])]
             count=count+1
             NSources.append(len(INPUT[1]))
-
-        avg_areal = np.mean(areal_arr)
-        return np.array(areal_arr), avg_areal, count, np.array(NSources), self.area, self.low_Flim, self.upp_Flim, self.obs_time
+        areal_arr=np.array(areal_arr)
+        NSources= np.array(NSources)
+        return areal_arr, mod_arr,t0_arr, Ha_arr, theta_arr, count, NSources, self.area, self.low_Flim, self.upp_Flim, self.obs_time, self.nu
 
 
 def test():
     sim=SIM()
-    results=sim.repeat()
-    outtab=Table()
-    msd = np.std(results[0])
+    areal_arr, mod_arr, t0_arr, Ha_arr, theta_arr, count, NSources, area, low_Flim, upp_Flim, obs_time, nu=sim.repeat()
+    datatab=Table()
+    resultstab=Table()
     if outfile!= False:
-        #print(results[1], msd, np.mean(results[3]) , results[4], results[5], results[6], results[2])
+        datafile=outfile[:-4]+'_data'+outfile[-4:]
+        ### DATA FILE
+        datatab.add_column(Column(data=np.arange(1,len(areal_arr)+1,1), name='Interations'))
+        datatab.add_column(Column(data=Ha_arr[:,0], name='H_Alpha Mean'))
+        datatab.add_column(Column(data=Ha_arr[:,1], name='H_Alpha STD'))
+        datatab.add_column(Column(data=mod_arr[:,0], name='Modulation Mean'))
+        datatab.add_column(Column(data=mod_arr[:,1], name='Modulation STD'))
+        datatab.add_column(Column(data=t0_arr[:,0], name='Timescale Mean'))
+        datatab.add_column(Column(data=t0_arr[:,1], name='Timescale STD'))
+        datatab.add_column(Column(data=theta_arr[:,0], name='Theta Mean'))
+        datatab.add_column(Column(data=theta_arr[:,1], name='Theta STD'))
+        datatab.add_column(Column(data=areal_arr, name='Areal Sky Density'))
+        datatab.write(datafile, overwrite=True)
 
-        Names=np.array(['Areal Sky Density', 'Stand Dev ASD', 'Number of sources', 'Area (deg^2)', 'Lower Flux Limit (Jy)',
-                        'Upper Flux Limit (Jy)', 'Observation Time','Iterations'])
-        Values = np.array([results[1], msd, np.mean(results[3]), results[4], results[5], results[6],  results[7],results[2]])
-        diff = np.empty(len(results[0]) - len(Names))
-        diff[:]=None
-        #print(diff)
-        #print(len(Names), len(Values), len(results[0]))
-        Names=np.append(Names,diff)
-        Values=np.append(Values,diff)
-        #print(len(Names), len(Values), len(results[0]))
-        outtab.add_column(Column(data=results[0], name='Modulation'))
-        outtab.add_column(Column(data=Names, length= len(results[0]), name='Parameters'))
-        outtab.add_column(Column(data=Values, length= len(results[0]), name='Values'))
-        outtab.write(outfile, overwrite=True)
-    print("Array: {0}".format(results[0]))
-    print("Avg Areal: {0}".format(results[1]))
-    print("Loops: {0}".format(results[2]))
-    print("Num Sources: {0}".format(np.mean(results[3])))
+        ##RESUTLS FILE
+        resultsfile = outfile[:-4] + '_results' + outfile[-4:]
+        Stats=['H_Alpha Mean','H_Alpha STD', 'Modulation Mean', 'Modulation STD', 'Timescale Mean (yrs)', 'Timescale STD (yrs)',
+               'Theta Mean (deg)', 'Theta STD (deg)', 'Areal Sky Desnity Mean',  'Areal Sky Desnity STD']
+        Stats_vals=[np.mean(Ha_arr[:,0]),np.std(Ha_arr[:,0]),np.mean(mod_arr[:,0]),np.std(mod_arr[:,0]),
+                    np.mean(t0_arr[:,0]),np.std(t0_arr[:,0]), np.mean(theta_arr[:,0]),np.std(theta_arr[:,0]),
+                    np.mean(areal_arr), np.std(areal_arr)]
+        Params=['Avg # Sources', 'Area (deg^2)', 'Lower Flux Limit (Jy)', 'Upper Flux Limit (Jy)', 'Observation time (days)', 'Frequency (MHz)']
+        Params.extend(["","","",""])
+        Param_vals=[np.mean(NSources), area, low_Flim, upp_Flim, obs_time, nu]
+        Param_vals.extend(["", "", "", ""])
+
+        resultstab.add_column(Column(data=Stats, name='Statistics'))
+        resultstab.add_column(Column(data=Stats_vals, name='Results'))
+        resultstab.add_column(Column(data=Params, name='Parameters'))
+        resultstab.add_column(Column(data=Param_vals, name='Values'))
+        resultstab.write(resultsfile, overwrite=True)
+
+    print("Array: {0}".format(areal_arr))
+    print("Avg Areal: {0}".format(np.mean(areal_arr)))
+    print("Iterations: {0}".format(len(areal_arr)))
+    print("Num Sources: {0}".format(np.mean(NSources)))
 
 
 test()
