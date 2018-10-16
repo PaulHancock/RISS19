@@ -78,7 +78,9 @@ class SIM(object):
             return output
 
         def diff_counts(a, b, low, upp):
-            bins = np.logspace(np.log10(low), np.log10(upp), num=100)
+            low=np.log10(low)
+            upp=np.log10(upp)
+            bins = np.logspace(low, upp, num=100)
             Ni = []
             mpoint = []
             dS = []
@@ -95,7 +97,7 @@ class SIM(object):
         a = 3900.
         bins, dnds,mid,Ni,width=diff_counts(a,1.6,low,upp)
         FLUX = []
-        Area = self.area * (np.pi ** 2.) / (180 ** 2.)
+        Area = self.area * (np.pi ** 2.) / (180. ** 2.)
 
         for i in range(0, len(bins) - 1):
             rang = np.arange(bins[i], bins[i]+width[i], width[i]/Ni[i], dtype=float)
@@ -210,6 +212,7 @@ class SIM(object):
         sm = SM(ha_file=os.path.join(datadir, 'Halpha_map.fits'),
                 err_file=os.path.join(datadir, 'Halpha_error.fits'),
                 nu=nu)
+        """
         # halpha
         val, err = sm.get_halpha(pos)
         tab.add_column(Column(data=val, name='Halpha'))
@@ -240,7 +243,22 @@ class SIM(object):
         tab.add_column(Column(data=err, name='err_theta_r'))
         #tab.write(self.output_name, overwrite=True)
         return tab['m'], tab['t0'], tab['Halpha'], tab['theta_r']
-
+        """
+        # Ha
+        val1, err1 = sm.get_halpha(pos)
+        # xi
+        #val2, err2 = sm.get_xi(pos)
+        # sm
+        #val3, err3 = sm.get_sm(pos)
+        # mod
+        val4, err4 = sm.get_m(pos, stype, ssize)
+        # t0
+        val5, err5 = sm.get_timescale(pos)
+        # rms
+        #val6, err6 = sm.get_rms_var(pos, stype, ssize)
+        # theta
+        val7, err7 = sm.get_theta(pos)
+        return val4, val5, val1, val7
     def areal_gen(self):
         flux, num = self.flux_gen()
         #print('flux', flux, num)
