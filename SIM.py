@@ -17,7 +17,7 @@ datadir = os.path.join(os.path.dirname(__file__), 'data')
 SFG=0
 AGN=1
 stypes=[SFG, AGN]
-sprobs=[0.5, 0.5]
+sprobs=[0.57, 0.43]
 
 parser = argparse.ArgumentParser()
 
@@ -29,6 +29,8 @@ parser.add_argument('-mc', action='store', dest='mc', default=0.05,
                     help='Store modulation cut off value')
 parser.add_argument('-t', action='store', dest='obs_time', default=183,
                     help='observation time in days')
+parser.add_argument('-a', action='store', dest='a', default=1150,
+                    help='Scaling Constant for source counts')
 parser.add_argument('-f', action='store', dest='nu', default=185.,
                     help='Frequency in MHz')
 parser.add_argument('-i', action='store', dest='loops', default=20,
@@ -64,6 +66,7 @@ class SIM(object):
         self.obs_time = np.float(results.obs_time) * 24. * 60. * 60.
         self.loops=np.int(results.loops)
         self.num_scale=40
+        self.a=results.a
 
     def flux_gen(self):
         """
@@ -94,7 +97,7 @@ class SIM(object):
             dNdS= Ni / dS  # * mpoint**2.5
             return bins, dNdS, mpoint, Ni, dS
 
-        a = 3900.
+        a = self.a
         bins, dnds,mid,Ni,width=diff_counts(a,1.6,low,upp)
         FLUX = []
         Area = self.area * (np.pi ** 2.) / (180. ** 2.)
