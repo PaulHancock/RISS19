@@ -17,7 +17,7 @@ datadir = os.path.join(os.path.dirname(__file__), 'data')
 SFG=0
 AGN=1
 stypes=[SFG, AGN]
-sprobs=[0.57, 0.43]
+sprobs=[0.84839, 1-0.84839]
 
 parser = argparse.ArgumentParser()
 
@@ -63,6 +63,7 @@ class SIM(object):
         #self.region_name=('testreg.mim')
         region=cPickle.load(open(self.region_name, 'rb'))
         self.area = region.get_area(degrees=True)
+        print(self.area)
         self.obs_time = np.float(results.obs_time) * 24. * 60. * 60.
         self.loops=np.int(results.loops)
         self.num_scale=40
@@ -103,7 +104,7 @@ class SIM(object):
         Area = self.area * (np.pi ** 2.) / (180. ** 2.)
 
         for i in range(0, len(bins) - 1):
-            rang = np.arange(bins[i], bins[i]+width[i], width[i]/Ni[i], dtype=float)
+            rang = np.logspace(np.log10(bins[i]), np.log10(bins[i]+width[i]), dtype=float)
             FLUX.extend(np.random.choice(rang, size=int(Ni[i]*Area)))
         flux_arr = np.random.permutation(np.array(FLUX))
 
@@ -268,6 +269,7 @@ class SIM(object):
         RA, DEC = self.region_gen(self.region_name)
         #print('RA')
         stype = self.stype_gen(RA)
+        print(np.sum(stype))
         ssize = self.ssize_gen(flux, stype)
         #print('SS')
         mod, t0, Ha, theta= self.output_gen(RA, DEC, stype, ssize)
@@ -277,13 +279,16 @@ class SIM(object):
         var = []
         for i in range(0, len(t0) - 1):
             if obs_yrs <= t0[i]:
-                mod[i] = mod[i] * (obs_yrs/t0[i])
+                print(mod[i])
+                mod[i] = mod[i] * (np.float(obs_yrs/t0[i]))
+                print(obs_yrs, t0[i], mod[i])
         for i in range(0, len(mod)):
             if mod[i] >= self.mod_cutoff:
                 mcount = mcount + 1
                 var.append(mod[i])
-
+        print(mcount, len(var))
         areal = mcount / self.area
+        print(self.area)
 
         return areal, mod, t0, Ha, theta
 
