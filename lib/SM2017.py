@@ -89,7 +89,7 @@ class SM(object):
         mask = np.where( top>far_edge)
         screen_dist = top
         screen_dist[mask] = far_edge[mask]
-        return screen_dist
+        return screen_dist/2
 
     def get_rf(self, position):
         """
