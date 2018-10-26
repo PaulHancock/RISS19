@@ -12,6 +12,7 @@ import logging
 import os
 import sys
 import argparse
+import numpy as np
 
 # Turn off the stupid warnings that Astropy emits when loading just about any fits file.
 import warnings
@@ -45,6 +46,8 @@ if __name__ == "__main__":
                         help='Calculate the scattering disk size (deg)')
     group1.add_argument('-v', '--nuzero', dest='nuzero', action='store_true', default=False,
                         help='Calculate the transition frequency (GHz)')
+    group1.add_argument('-f', '--fzero', dest='fzero', action='store_true', default=False,
+                        help='Calculate the Fresnel zone (deg)')
     group1.add_argument('--all', dest='do_all', action='store_true', default=False,
                         help='Include all parameters')
 
@@ -79,7 +82,7 @@ if __name__ == "__main__":
 
     if results.do_all:
         results.halpha = results.sm = results.m = results.rms = True
-        results.xi = results.t0 = results.theta = results.nuzero = True
+        results.xi = results.t0 = results.theta = results.nuzero = results.fzero = True
 
     # data is stored in the data dir, relative to *this* file
     datadir = os.path.join(os.path.dirname(__file__), 'data')
@@ -139,8 +142,10 @@ if __name__ == "__main__":
             val = sm.get_vo(pos)
             print("nu0: ", val, "GHz")
         if d == 0:
-            val = sm.get_distance(pos)
-            print("D: ", val, "kpc")
+            d = sm.get_distance(pos)
+            print("D: ", d, "kpc")
+            rf = sm.get_rf(pos)
+            print("theta_F0: ", np.degrees(rf/(d*sm.kpc)), "deg")
         sys.exit(0)
 
     if results.infile:
