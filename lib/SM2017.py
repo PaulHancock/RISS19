@@ -53,7 +53,7 @@ class SM(object):
         self.c = c.value
         self.beta = 11/3
         self.re = 2.817e-15  # m
-        self.rf_1kpc = np.sqrt(self.c * self.kpc / (2*np.pi*self.nu))  # Fresnel scale assuming that D = 1kpc
+        self.rf = np.sqrt(self.c * self.D * self.kpc / (2*np.pi*self.nu))  # Fresnel scale
         self.v = v  # relative velocity of source/observer in m/s
         #self.log.debug("data:{0} err:{1}".format(ha_file,err_file))
         self.file = ha_file
@@ -125,7 +125,7 @@ class SM(object):
         """
         # Narayan 1992 eq 4.2
         rdiff, err_rdiff = self.get_rdiff(position)
-        rref = self.rf_1kpc**2 / rdiff
+        rref = self.rf**2 / rdiff
         err_rref = (err_rdiff / rdiff) * rref
         return rref, err_rref
 
@@ -139,7 +139,7 @@ class SM(object):
         rdiff, err_rdiff = self.get_rdiff(position)
         # Narayan 1992, uses r_F/r_diff = \xi without explicitly stating that this is being done
         # Compare Narayan 1992 eq 3.5 with Walker 1998 eq 6
-        xi = self.rf_1kpc / rdiff
+        xi = self.rf / rdiff
         err_xi = (err_rdiff/rdiff)*xi
         return xi, err_xi
 
@@ -179,11 +179,11 @@ class SM(object):
         :return:
         """
         xi, err_xi = self.get_xi(position)
-        tref = self.rf_1kpc *xi / self.v / seconds_per_year
-        err_tref=(err_xi/xi)*tref
+        tref = self.rf *xi / self.v / seconds_per_year
+        err_tref = (err_xi/xi)*tref
         return tref, err_tref
 
-    def get_rms_var(self, position,stype,ssize, nyears=1):
+    def get_rms_var(self, position, stype=AGN, ssize=0, nyears=1):
         """
         calculate the expected RMS variation in nyears at a given sky coord
         rms variability is fraction/year
@@ -192,12 +192,21 @@ class SM(object):
         :return:
         """
         tref, err_tref=self.get_timescale(position)
-        m, err_m= self.get_m(position,stype,ssize)
+        m, err_m = self.get_m(position, stype, ssize)
         #basic uncertainty propagation, can probably change.
-        t =m/tref * nyears
-        err_t=((err_m/m)+(err_tref/tref))*t
+        t = m/tref * nyears
+        err_t = ((err_m/m)+(err_tref/tref))*t
         return t, err_t
 
+    def get_vo(self, position):
+        """
+        Calculate the transition frequency at a given sky location
+        :param position:
+        :return: Transition frequency in Hz
+        """
+        rdiff = (2 ** (2 - self.beta) * (np.pi * self.re ** 2 * (self.c / self.nu) ** 2 * self.beta) * sm2 * self.kpc *
+                gamma(-self.beta / 2) / gamma(self.beta / 2)) ** (1 / (2 - self.beta))
+        rf =0
 
 def test_all_params():
     print("Testing with single positions")
@@ -210,7 +219,7 @@ def test_all_params():
     print("t0 = {0} (sec)".format(sm.get_timescale(pos)))
     print("r_diff = {0} (m)".format(sm.get_rdiff(pos)))
     print("r_ref = {0} (m)".format(sm.get_rref(pos)))
-    print("r_F = {0} (m)".format(sm.rf_1kpc))
+    print("r_F = {0} (m)".format(sm.rf))
     print("rms = {0}".format(sm.get_rms_var(pos)))
     print("theta = {0} (rad)".format(np.radians(sm.get_theta(pos))))
 
