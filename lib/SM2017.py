@@ -19,6 +19,8 @@ from scipy.special import gamma
 
 __author__ = 'Paul Hancock'
 __date__ = '2017-02-23'
+SFG=0
+AGN=1
 
 seconds_per_year = 3600 * 24 * 365.25
 
@@ -47,14 +49,13 @@ class SM(object):
         self.t4 = 0.8  # t/1e4 K
         self.lo = 1e18/(self.kpc*1e-3)  # pc
         self.eps = 1
-        self.D = d  # kpc
+        self.D = 1  # kpc - distance to the screen
         self.c = c.value
         self.beta = 11/3
         self.re = 2.817e-15  # m
-        # From Narayan 1992 eq 2.2
-        self.rf_1kpc = np.sqrt(self.c * self.D * self.kpc / (2*np.pi*self.nu))  # Fresnel scale
-        self.v = v  # relative velocity of source/observer in m/s
-        self.log.debug("data:{0} err:{1}".format(ha_file, err_file))
+        self.rf_1kpc = np.sqrt(self.c * self.kpc / (2*np.pi*self.nu))  # Fresnel scale assuming that D = 1kpc
+        self.v = 1e4  # relative velocity of source/observer in m/s
+        #self.log.debug("data:{0} err:{1}".format(ha_file,err_file))
         self.file = ha_file
         self.err_file = err_file
         self._load_file()
@@ -154,16 +155,20 @@ class SM(object):
         err_theta = np.degrees(err_r_ref / (self.D*self.kpc))
         return theta, err_theta
 
-    def get_m(self, position):
+    def get_m(self, position, stype=AGN, ssize=0):
         """
         calculate the modulation index using parameter ξ for a given sky coord
         :param position: astropy.coordinates.SkyCoord
         :return:
         """
         xi, err_xi = self.get_xi(position)
-        # Narayan 1992 eq 4.10 or Walker 1998 eq
-        m = xi**(-1/3)
-        err_m=(1/3)*(err_xi/xi)*m
+        if stype == AGN:
+            m = xi**(-1./3.)
+            err_m=(1./3.)*(err_xi/xi)*m
+        else:
+            theta, err_theta = self.get_theta(position)
+            m = (xi**(-1./3.))*(theta/ssize)**(7./6.)
+            err_m=((1./3.)*(err_xi/xi)*(7./6.)*(err_theta/theta))*m
         return m, err_m
 
     def get_timescale(self, position):
@@ -178,7 +183,7 @@ class SM(object):
         err_tref=(err_xi/xi)*tref
         return tref, err_tref
 
-    def get_rms_var(self, position, nyears=1):
+    def get_rms_var(self, position,stype,ssize, nyears=1):
         """
         calculate the expected RMS variation in nyears at a given sky coord
         rms variability is fraction/year
@@ -187,7 +192,7 @@ class SM(object):
         :return:
         """
         tref, err_tref=self.get_timescale(position)
-        m, err_m= self.get_m(position)
+        m, err_m= self.get_m(position,stype,ssize)
         #basic uncertainty propagation, can probably change.
         t =m/tref * nyears
         err_t=((err_m/m)+(err_tref/tref))*t
@@ -216,7 +221,7 @@ def test_multi_pos():
     pos = SkyCoord([0, 4, 8, 12, 16, 20]*u.hour, [-90, -45, 0, 45, 90, -26]*u.degree)
     print("Hα = {0}".format(sm.get_halpha(pos)))
     print("ξ = {0}".format(sm.get_xi(pos)))
-    print("m = {0}".format(sm.get_m(pos)))
+    print("m = {0}".format(sm.get_m(pos,stype,ssize)))
     print("sm = {0}".format(sm.get_sm(pos)))
     print("t0 = {0}".format(sm.get_timescale(pos)))
     print("rms = {0}".format(sm.get_rms_var(pos)))
