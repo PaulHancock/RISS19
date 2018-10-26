@@ -138,6 +138,9 @@ if __name__ == "__main__":
         if results.nuzero:
             val = sm.get_vo(pos)
             print("nu0: ", val, "GHz")
+        if d == 0:
+            val = sm.get_distance(pos)
+            print("D: ", val, "kpc")
         sys.exit(0)
 
     if results.infile:
@@ -195,6 +198,9 @@ if __name__ == "__main__":
         if results.nuzero:
             val = sm.get_vo(pos)
             tab.add_column(Column(data=val, name='nu0'))
+        if d == 0:
+            val = sm.get_distance(pos)
+            tab.add_column(Column(data=val, name='D'))
         print("Writing to {0}".format(results.outfile))
         tab.write(results.outfile, overwrite=True)
 
