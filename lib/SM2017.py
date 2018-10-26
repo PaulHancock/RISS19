@@ -256,6 +256,7 @@ class SM(object):
         vo = self.c * (np.sqrt(D*self.kpc/(2*np.pi)) / A)**(1/(0.5 - 2*pow))
         return vo/1e9
 
+
 def test_all_params():
     print("Testing with single positions")
     sm = SM(os.path.join('data', 'Halpha_map.fits'), os.path.join('data', 'Halpha_error.fits'), nu=1e8)
