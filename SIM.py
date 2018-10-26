@@ -63,7 +63,6 @@ class SIM(object):
         #self.region_name=('testreg.mim')
         region=cPickle.load(open(self.region_name, 'rb'))
         self.area = region.get_area(degrees=True)
-        print(self.area)
         self.obs_time = np.float(results.obs_time) * 24. * 60. * 60.
         self.loops=np.int(results.loops)
         self.num_scale=40
@@ -138,10 +137,10 @@ class SIM(object):
         x, y, z = np.array(x) / np.array(r), np.array(y) / np.array(r), np.array(z) / np.array(r)
         r0 = (x ** 2.0 + y ** 2.0 + z ** 2.0) ** 0.5
         theta = np.arccos(z / r0) * 180 / np.pi
-        theta = theta - 90
+        theta = theta - 90.
         theta = theta[:num]
-        phi = np.arctan2(y, x) * 180 / (np.pi)
-        phi = phi + 180
+        phi = np.arctan2(y, x) * 180. / (np.pi)
+        phi = phi + 180.
         phi = phi[:num]
         return phi, theta
 
@@ -269,7 +268,6 @@ class SIM(object):
         RA, DEC = self.region_gen(self.region_name)
         #print('RA')
         stype = self.stype_gen(RA)
-        print(np.sum(stype))
         ssize = self.ssize_gen(flux, stype)
         #print('SS')
         mod, t0, Ha, theta= self.output_gen(RA, DEC, stype, ssize)
@@ -279,17 +277,12 @@ class SIM(object):
         var = []
         for i in range(0, len(t0) - 1):
             if obs_yrs <= t0[i]:
-                print(mod[i])
                 mod[i] = mod[i] * (np.float(obs_yrs/t0[i]))
-                print(obs_yrs, t0[i], mod[i])
         for i in range(0, len(mod)):
             if mod[i] >= self.mod_cutoff:
                 mcount = mcount + 1
                 var.append(mod[i])
-        print(mcount, len(var))
         areal = mcount / self.area
-        print(self.area)
-
         return areal, mod, t0, Ha, theta
 
     def repeat(self):
@@ -344,7 +337,7 @@ def test():
                     np.mean(areal_arr), np.std(areal_arr)]
         Params=['Avg # Sources', 'Area (deg^2)', 'Lower Flux Limit (Jy)', 'Upper Flux Limit (Jy)', 'Observation time (days)', 'Frequency (MHz)']
         Params.extend(["","","",""])
-        Param_vals=[np.mean(NSources), area, low_Flim, upp_Flim, obs_time, nu]
+        Param_vals=[np.mean(NSources), area, low_Flim, upp_Flim, obs_time/(24.*3600.), nu/(1E6)]
         Param_vals.extend(["", "", "", ""])
 
         resultstab.add_column(Column(data=Stats, name='Statistics'))
