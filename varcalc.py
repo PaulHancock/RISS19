@@ -28,7 +28,7 @@ __date__ = '2017-03-02'
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    group1 = parser.add_argument_group('Parameter selection')
+    group1 = parser.add_argument_group('Output parameter selection')
     group1.add_argument('-H', '--Halpha', dest='halpha', action='store_true', default=False,
                         help='Calculate Hα intensity (Rayleighs)')
     group1.add_argument('-x', '--xi', dest='xi', action='store_true', default=False,
@@ -65,6 +65,10 @@ if __name__ == "__main__":
     group3 = parser.add_argument_group('Input parameter settings')
     group3.add_argument('--freq', dest='frequency', default=185, type=float,
                         help="Frequency in MHz")
+    group3.add_argument('--dist', dest='distance', default=1, type=float,
+                        help="Distance to scattering screen in kpc")
+    group3.add_argument('--vel', dest='velocity', default=10, type=float,
+                        help="Relative motion of screen and observer in km/s")
 
     results = parser.parse_args()
 
@@ -78,6 +82,8 @@ if __name__ == "__main__":
     datadir = os.path.join(os.path.dirname(__file__), 'data')
 
     nu = results.frequency*1e6
+    d = results.distance
+    v = results.velocity * 1e3
     # For doing a one off position calculation
 
     if results.galactic:
@@ -94,7 +100,9 @@ if __name__ == "__main__":
         sm = SM(ha_file=os.path.join(datadir, 'Halpha_map.fits'),
                 err_file=os.path.join(datadir, 'Halpha_error.fits'),
                 nu=nu,
-                log=log)
+                log=log,
+                d=d,
+                v=v)
         if results.halpha:
             logging.debug(sm.get_halpha(pos))
             val,err=sm.get_halpha(pos)
@@ -140,7 +148,9 @@ if __name__ == "__main__":
         sm = SM(ha_file=os.path.join(datadir, 'Halpha_map.fits'),
                 err_file=os.path.join(datadir, 'Halpha_error.fits'),
                 nu=nu,
-                log=log)
+                log=log,
+                d=d,
+                v=v)
         # make a new table for writing and copy the ra/dec unless we are appending to the old file
         if not results.append:
             tab = Table()
