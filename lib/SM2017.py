@@ -23,7 +23,15 @@ __date__ = '2017-02-23'
 seconds_per_year = 3600 * 24 * 365.25
 
 class SM(object):
-    def __init__(self, ha_file, err_file=None, nu=185e6, log=None):
+    """
+    :param ha_file:
+    :param err_file:
+    :param nu: freq in Hz
+    :param d: distance in kpc
+    :param v: in m/s
+    :param log:
+    """
+    def __init__(self, ha_file, err_file=None, nu=185e6, log=None, d=1, v=10e3):
 
         if log is None:
             logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
@@ -39,13 +47,13 @@ class SM(object):
         self.t4 = 0.8  # t/1e4 K
         self.lo = 1e18/(self.kpc*1e-3)  # pc
         self.eps = 1
-        self.D = 1  # kpc
+        self.D = d  # kpc
         self.c = c.value
         self.beta = 11/3
         self.re = 2.817e-15  # m
         # From Narayan 1992 eq 2.2
-        self.rf_1kpc = np.sqrt(self.c * self.kpc / (2*np.pi*self.nu))  # Fresnel scale assuming that D = 1kpc
-        self.v = 1e4  # relative velocity of source/observer in m/s
+        self.rf_1kpc = np.sqrt(self.c * self.D * self.kpc / (2*np.pi*self.nu))  # Fresnel scale
+        self.v = v  # relative velocity of source/observer in m/s
         self.log.debug("data:{0} err:{1}".format(ha_file, err_file))
         self.file = ha_file
         self.err_file = err_file
@@ -98,9 +106,10 @@ class SM(object):
         """
         Calculate the diffractive scale at the given sky coord
         :param position: astropy.coordinates.SkyCoord
-        :return: parameter r_diff
+        :return: parameter r_diff in m
         """
         sm2, err_sm2 = self.get_sm(position)
+        # ^ units are kpc m^{-20/3}, but we want m^{-17/3} so we have to multiply by kpc below
         # r_diff as per Mcquart & Koay 2013, eq 7a.
         rdiff = (2**(2-self.beta) * (np.pi * self.re**2 * (self.c/self.nu)**2 * self.beta) * sm2 * self.kpc *
                  gamma(-self.beta/2)/gamma(self.beta/2))**(1/(2-self.beta))
@@ -111,7 +120,7 @@ class SM(object):
         """
         Calculate the refractive scale at the given sky coord
         :param position: astropy.coordinates.SkyCoord
-        :return: parameter r_ref
+        :return: parameter r_ref in m
         """
         # Narayan 1992 eq 4.2
         rdiff, err_rdiff = self.get_rdiff(position)
@@ -137,7 +146,7 @@ class SM(object):
         """
         calculate the size of the scattering disk for a given sky coord
         :param position: astropy.coordinates.SkyCoord
-        :return:
+        :return: scattering disk in degrees
         """
         # See Narayan 1992 eq 4.10 and discussion immediately prior
         r_ref, err_r_ref = self.get_rref(position)
@@ -187,15 +196,18 @@ class SM(object):
 
 def test_all_params():
     print("Testing with single positions")
-    sm = SM(os.path.join('data', 'Halpha_map.fits'), os.path.join('data', 'Halpha_error.fits'))
+    sm = SM(os.path.join('data', 'Halpha_map.fits'), os.path.join('data', 'Halpha_error.fits'), nu=1e8)
     pos = SkyCoord([0], [0], unit=(u.hour, u.degree))
     print("Hα = {0}".format(sm.get_halpha(pos)))
     print("ξ = {0}".format(sm.get_xi(pos)))
     print("m = {0}".format(sm.get_m(pos)))
-    print("sm = {0}".format(sm.get_sm(pos)))
-    print("t0 = {0}".format(sm.get_timescale(pos)))
+    print("sm = {0} (m^-17/3)".format(sm.get_sm(pos)[0]*sm.kpc))
+    print("t0 = {0} (sec)".format(sm.get_timescale(pos)))
+    print("r_diff = {0} (m)".format(sm.get_rdiff(pos)))
+    print("r_ref = {0} (m)".format(sm.get_rref(pos)))
+    print("r_F = {0} (m)".format(sm.rf_1kpc))
     print("rms = {0}".format(sm.get_rms_var(pos)))
-    print("theta = {0}".format(sm.get_theta(pos)))
+    print("theta = {0} (rad)".format(np.radians(sm.get_theta(pos))))
 
 
 def test_multi_pos():
