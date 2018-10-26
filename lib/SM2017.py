@@ -202,11 +202,14 @@ class SM(object):
         """
         Calculate the transition frequency at a given sky location
         :param position:
-        :return: Transition frequency in Hz
+        :return: Transition frequency in GHz
         """
-        rdiff = (2 ** (2 - self.beta) * (np.pi * self.re ** 2 * (self.c / self.nu) ** 2 * self.beta) * sm2 * self.kpc *
-                gamma(-self.beta / 2) / gamma(self.beta / 2)) ** (1 / (2 - self.beta))
-        rf =0
+        sm2, _ = self.get_sm(position)
+        pow = (1 / (2 - self.beta))
+        A = (2 ** (2 - self.beta) * (np.pi * self.re ** 2 * self.beta) * sm2 * self.kpc *
+                gamma(-self.beta / 2) / gamma(self.beta / 2)) ** pow
+        vo = self.c * (np.sqrt(self.D*self.kpc/(2*np.pi)) / A)**(1/(0.5 - 2*pow))
+        return vo/1e9
 
 def test_all_params():
     print("Testing with single positions")
@@ -222,6 +225,7 @@ def test_all_params():
     print("r_F = {0} (m)".format(sm.rf))
     print("rms = {0}".format(sm.get_rms_var(pos)))
     print("theta = {0} (rad)".format(np.radians(sm.get_theta(pos))))
+    print("nu_0 = {0} (GHz)".format(sm.get_vo(pos)))
 
 
 def test_multi_pos():
@@ -230,7 +234,7 @@ def test_multi_pos():
     pos = SkyCoord([0, 4, 8, 12, 16, 20]*u.hour, [-90, -45, 0, 45, 90, -26]*u.degree)
     print("Hα = {0}".format(sm.get_halpha(pos)))
     print("ξ = {0}".format(sm.get_xi(pos)))
-    print("m = {0}".format(sm.get_m(pos,stype,ssize)))
+    print("m = {0}".format(sm.get_m(pos)))
     print("sm = {0}".format(sm.get_sm(pos)))
     print("t0 = {0}".format(sm.get_timescale(pos)))
     print("rms = {0}".format(sm.get_rms_var(pos)))
