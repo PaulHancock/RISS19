@@ -73,6 +73,31 @@ class SM(object):
 
         return
 
+    @staticmethod
+    def get_distance(position):
+        """
+        :param position: sky position
+        :return: Distance to scattering screen in kpc
+        """
+        gal_r = 40  # kpc
+        sun_r = 8   # kpc
+        gal_h = 1   # kpc
+        theta = position.galactic.l.radian # angle from the GC along the plane
+        phi = position.galactic.b.radian   # angle from the GC perp to the plane
+        far_edge = sun_r*np.cos(theta) + np.sqrt(gal_r**2 - sun_r**2*np.sin(theta**2))
+        top = 1 / (gal_h/2 * np.sin(phi))
+        mask = np.where( top>far_edge)
+        screen_dist = top
+        screen_dist[mask] = far_edge[mask]
+        return screen_dist
+
+    def get_rf(self, position):
+        """
+        :param position: Sky position
+        :return: Fresnel scale in m
+        """
+        return np.sqrt(self.c * self.get_distance(position) * self.kpc / (2*np.pi*self.nu))
+
     def get_halpha(self, position):
         """
         Return the Halpha for a given location on the sky.
@@ -125,7 +150,11 @@ class SM(object):
         """
         # Narayan 1992 eq 4.2
         rdiff, err_rdiff = self.get_rdiff(position)
-        rref = self.rf**2 / rdiff
+        if self.rf ==0 :
+            rf = self.get_rf(position)
+        else:
+            rf = self.rf
+        rref = rf**2 / rdiff
         err_rref = (err_rdiff / rdiff) * rref
         return rref, err_rref
 
@@ -139,7 +168,11 @@ class SM(object):
         rdiff, err_rdiff = self.get_rdiff(position)
         # Narayan 1992, uses r_F/r_diff = \xi without explicitly stating that this is being done
         # Compare Narayan 1992 eq 3.5 with Walker 1998 eq 6
-        xi = self.rf / rdiff
+        if self.rf ==0 :
+            rf = self.get_rf(position)
+        else:
+            rf = self.rf
+        xi = rf / rdiff
         err_xi = (err_rdiff/rdiff)*xi
         return xi, err_xi
 
@@ -151,8 +184,12 @@ class SM(object):
         """
         # See Narayan 1992 eq 4.10 and discussion immediately prior
         r_ref, err_r_ref = self.get_rref(position)
-        theta = np.degrees(r_ref / (self.D*self.kpc))
-        err_theta = np.degrees(err_r_ref / (self.D*self.kpc))
+        if self.D ==0 :
+            D = self.get_distance(position)
+        else:
+            D = self.D
+        theta = np.degrees(r_ref / (D*self.kpc))
+        err_theta = np.degrees(err_r_ref / (D*self.kpc))
         return theta, err_theta
 
     def get_m(self, position, stype=AGN, ssize=0):
@@ -179,7 +216,11 @@ class SM(object):
         :return:
         """
         xi, err_xi = self.get_xi(position)
-        tref = self.rf *xi / self.v / seconds_per_year
+        if self.rf ==0 :
+            rf = self.get_rf(position)
+        else:
+            rf = self.rf
+        tref = rf *xi / self.v / seconds_per_year
         err_tref = (err_xi/xi)*tref
         return tref, err_tref
 
@@ -208,7 +249,11 @@ class SM(object):
         pow = (1 / (2 - self.beta))
         A = (2 ** (2 - self.beta) * (np.pi * self.re ** 2 * self.beta) * sm2 * self.kpc *
                 gamma(-self.beta / 2) / gamma(self.beta / 2)) ** pow
-        vo = self.c * (np.sqrt(self.D*self.kpc/(2*np.pi)) / A)**(1/(0.5 - 2*pow))
+        if self.D ==0 :
+            D = self.get_distance(position)
+        else:
+            D = self.D
+        vo = self.c * (np.sqrt(D*self.kpc/(2*np.pi)) / A)**(1/(0.5 - 2*pow))
         return vo/1e9
 
 def test_all_params():
