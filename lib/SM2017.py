@@ -196,16 +196,19 @@ class SM(object):
         """
         calculate the modulation index using parameter ξ for a given sky coord
         :param position: astropy.coordinates.SkyCoord
+        :param stype: Ignored
+        :param ssize: source size in deg
         :return:
         """
         xi, err_xi = self.get_xi(position)
-        if stype == AGN:
-            m = xi**(-1./3.)
-            err_m=(1./3.)*(err_xi/xi)*m
-        else:
-            theta, err_theta = self.get_theta(position)
-            m = (xi**(-1./3.))*(theta/ssize)**(7./6.)
-            err_m=((1./3.)*(err_xi/xi)*(7./6.)*(err_theta/theta))*m
+
+        m = xi**(-1./3.)
+        err_m = (1./3.)*(err_xi/xi)*m
+
+        theta, err_theta = self.get_theta(position)
+        large = np.where(ssize > theta)
+        m[large] *= (theta[large]/ssize)**(7./6.)
+        err_m[large] *= (7./6.)*(err_theta[large]/theta[large])
         return m, err_m
 
     def get_timescale(self, position):
