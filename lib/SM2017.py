@@ -235,18 +235,21 @@ class SM(object):
 
     def get_rms_var(self, position, stype=AGN, ssize=0, nyears=1):
         """
-        calculate the expected RMS variation in nyears at a given sky coord
-        rms variability is fraction/year
+        calculate the expected modulation index observed when measured on nyears timescales
+        at a given sky coord
         :param position: astropy.coordinates.SkyCoord
         :param nyears: timescale of interest
+        :param ssize: source size in deg
         :return:
         """
-        tref, err_tref=self.get_timescale(position)
-        m, err_m = self.get_m(position, stype, ssize)
-        #basic uncertainty propagation, can probably change.
-        t = m/tref * nyears
-        err_t = ((err_m/m)+(err_tref/tref))*t
-        return t, err_t
+
+        tref, err_tref=self.get_timescale(position, ssize=ssize)
+        m, err_m = self.get_m(position, ssize=ssize)
+
+        short = np.where(nyears*seconds_per_year < tref)
+        m[short] *= (nyears*seconds_per_year/tref[short])
+        err_m[short] *= (nyears*seconds_per_year/tref[short])
+        return m, err_m
 
     def get_vo(self, position):
         """
