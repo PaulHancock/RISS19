@@ -92,6 +92,10 @@ if __name__ == "__main__":
     v = results.velocity * 1e3
     # For doing a one off position calculation
 
+    if results.pos is None and results.infile is None:
+        parser.print_usage()
+        sys.exit(0)
+
     if results.galactic:
         log.info("Using galactic coordinates")
         frame = 'galactic'
