@@ -211,7 +211,7 @@ class SM(object):
         err_m[large] *= (7./6.)*(err_theta[large]/theta[large])
         return m, err_m
 
-    def get_timescale(self, position):
+    def get_timescale(self, position, ssize=0):
         """
         calculate the refractive timescale using parameter ξ for a given sky coord
         timescale is in years
@@ -225,6 +225,12 @@ class SM(object):
             rf = self.rf
         tref = rf *xi / self.v / seconds_per_year
         err_tref = (err_xi/xi)*tref
+
+        # timescale is longer for 'large' sources
+        theta, err_theta = self.get_theta(position)
+        large = np.where(ssize > theta)
+        tref[large] *= ssize/theta[large]
+        err_tref[large] *= ssize/theta[large]
         return tref, err_tref
 
     def get_rms_var(self, position, stype=AGN, ssize=0, nyears=1):
