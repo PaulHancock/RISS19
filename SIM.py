@@ -313,12 +313,12 @@ class SIM(object):
         #    plt.savefig('ASD_sim.png')
         #    plt.show()
 
-        return areal_arr, mod_arr,t0_arr, Ha_arr, theta_arr, count, NSources, self.area, self.low_Flim, self.upp_Flim, self.obs_time, self.nu
+        return areal_arr, mod_arr,t0_arr, Ha_arr, theta_arr, count, NSources, self.area, self.low_Flim, self.upp_Flim, self.obs_time, self.nu, self.mod_cutoff
 
 
 def test():
     sim=SIM()
-    areal_arr, mod_arr, t0_arr, Ha_arr, theta_arr, count, NSources, area, low_Flim, upp_Flim, obs_time, nu=sim.repeat()
+    areal_arr, mod_arr, t0_arr, Ha_arr, theta_arr, count, NSources, area, low_Flim, upp_Flim, obs_time, nu, mod_cutoff=sim.repeat()
     datatab=Table()
     resultstab=Table()
     if outfile!= False:
@@ -343,10 +343,10 @@ def test():
         Stats_vals=[np.mean(Ha_arr[:,0]),np.std(Ha_arr[:,0]),np.mean(mod_arr[:,0]),np.std(mod_arr[:,0]),
                     np.mean(t0_arr[:,0]),np.std(t0_arr[:,0]), np.mean(theta_arr[:,0]),np.std(theta_arr[:,0]),
                     np.mean(areal_arr), np.std(areal_arr)]
-        Params=['Avg # Sources', 'Avg Variables','Area (deg^2)', 'Lower Flux Limit (Jy)', 'Upper Flux Limit (Jy)', 'Observation time (days)', 'Frequency (MHz)']
-        Params.extend(["","",""])
-        Param_vals=[np.mean(NSources),area*np.mean(areal_arr), area, low_Flim, upp_Flim, obs_time/(24.*3600.), nu/(1E6)]
-        Param_vals.extend(["", "", ""])
+        Params=['Avg # Sources', 'Avg Variables','Area (deg^2)', 'Lower Flux Limit (Jy)', 'Upper Flux Limit (Jy)', 'Observation time (days)', 'Frequency (MHz)', 'Modulation Cutoff']
+        Params.extend(["",""])
+        Param_vals=[np.mean(NSources),area*np.mean(areal_arr), area, low_Flim, upp_Flim, obs_time/(24.*3600.), nu/(1E6), mod_cutoff]
+        Param_vals.extend(["", ""])
 
         resultstab.add_column(Column(data=Stats, name='Statistics'))
         resultstab.add_column(Column(data=Stats_vals, name='Results'))
