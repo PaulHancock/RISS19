@@ -29,7 +29,7 @@ parser.add_argument('-mc', action='store', dest='mc', default=0.05,
                     help='Store modulation cut off value')
 parser.add_argument('-t', action='store', dest='obs_time', default=183,
                     help='observation time in days')
-parser.add_argument('-a', action='store', dest='a', default=1150,
+parser.add_argument('-a', action='store', dest='a', default=3300.,
                     help='Scaling Constant for source counts')
 parser.add_argument('-f', action='store', dest='nu', default=185.,
                     help='Frequency in MHz')
@@ -69,7 +69,7 @@ class SIM(object):
         self.obs_time = np.float(results.obs_time) * 24. * 60. * 60.
         self.loops=np.int(results.loops)
         self.num_scale=40
-        self.a=results.a
+        self.a=np.float(results.a)
 
     def flux_gen(self):
         """
@@ -308,10 +308,11 @@ class SIM(object):
             NSources.append(len(INPUT[1]))
         areal_arr=np.array(areal_arr)
         NSources= np.array(NSources)
-        if self.figure == True:
-            plt.hist(areal_arr,10)
-            plt.show()
-            plt.savefig('ASD_sim.png')
+        #if self.figure != False:
+        #    plt.hist(areal_arr,10)
+        #    plt.savefig('ASD_sim.png')
+        #    plt.show()
+
         return areal_arr, mod_arr,t0_arr, Ha_arr, theta_arr, count, NSources, self.area, self.low_Flim, self.upp_Flim, self.obs_time, self.nu
 
 
@@ -342,10 +343,10 @@ def test():
         Stats_vals=[np.mean(Ha_arr[:,0]),np.std(Ha_arr[:,0]),np.mean(mod_arr[:,0]),np.std(mod_arr[:,0]),
                     np.mean(t0_arr[:,0]),np.std(t0_arr[:,0]), np.mean(theta_arr[:,0]),np.std(theta_arr[:,0]),
                     np.mean(areal_arr), np.std(areal_arr)]
-        Params=['Avg # Sources', 'Area (deg^2)', 'Lower Flux Limit (Jy)', 'Upper Flux Limit (Jy)', 'Observation time (days)', 'Frequency (MHz)']
-        Params.extend(["","","",""])
-        Param_vals=[np.mean(NSources), area, low_Flim, upp_Flim, obs_time/(24.*3600.), nu/(1E6)]
-        Param_vals.extend(["", "", "", ""])
+        Params=['Avg # Sources', 'Avg Variables','Area (deg^2)', 'Lower Flux Limit (Jy)', 'Upper Flux Limit (Jy)', 'Observation time (days)', 'Frequency (MHz)']
+        Params.extend(["","",""])
+        Param_vals=[np.mean(NSources),area*np.mean(areal_arr), area, low_Flim, upp_Flim, obs_time/(24.*3600.), nu/(1E6)]
+        Param_vals.extend(["", "", ""])
 
         resultstab.add_column(Column(data=Stats, name='Statistics'))
         resultstab.add_column(Column(data=Stats_vals, name='Results'))
@@ -358,6 +359,8 @@ def test():
     if len(areal_arr)<=20:
         print("Iterations: {0}".format(len(areal_arr)))
     print("Num Sources: {0}".format(np.mean(NSources)))
+    print("Area: {0}".format(area))
+    print("Num Variable: {0}".format(np.mean(areal_arr)*area))
 
 
 test()
