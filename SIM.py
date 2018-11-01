@@ -39,6 +39,8 @@ parser.add_argument('-reg', action='store', dest='region_name',
                     help='read in region file')
 parser.add_argument('--out', dest='outfile', default=False, type=str,
                         help="Table of results")
+parser.add_argument('--fig', dest='figure', default=False,
+                        help="Save Figure?")
 parser.add_argument('--version', action='version', version='%(prog)s 1.0')
 
 results = parser.parse_args()
@@ -54,6 +56,7 @@ class SIM(object):
         else:
             self.log=log
         #Variables
+        self.figure=results.figure
         self.nu = np.float(results.nu) * 1e6
         self.arcsec = np.pi / (180. * 3600.)
         self.mod_cutoff = np.float(results.mc)
@@ -205,7 +208,7 @@ class SIM(object):
         output_table.write(output_name, overwrite=True)
 
     def output_gen(self, ra, dec, stype, ssize):
-        nu = self.nu
+        nu = np.float(self.nu)
         frame = 'fk5'
         tab = Table()
 
@@ -305,6 +308,10 @@ class SIM(object):
             NSources.append(len(INPUT[1]))
         areal_arr=np.array(areal_arr)
         NSources= np.array(NSources)
+        if self.figure == True:
+            plt.hist(areal_arr,10)
+            plt.show()
+            plt.savefig('ASD_sim.png')
         return areal_arr, mod_arr,t0_arr, Ha_arr, theta_arr, count, NSources, self.area, self.low_Flim, self.upp_Flim, self.obs_time, self.nu
 
 
@@ -348,7 +355,8 @@ def test():
 
     print("Array: {0}".format(areal_arr))
     print("Avg Areal: {0}".format(np.mean(areal_arr)))
-    print("Iterations: {0}".format(len(areal_arr)))
+    if len(areal_arr)<=20:
+        print("Iterations: {0}".format(len(areal_arr)))
     print("Num Sources: {0}".format(np.mean(NSources)))
 
 
