@@ -7,7 +7,7 @@ NE2001 for extragalactic work.
 """
 
 
-from astropy.constants import kpc, c
+from astropy.constants import kpc, c, au
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -47,7 +47,9 @@ class SM(object):
         self.nu = nu  # Hz
         self.kpc = kpc.value  # in m
         self.t4 = 0.8  # t/1e4 K
-        self.lo = 1e18/(self.kpc*1e-3)  # pc
+        # self.lo = 1e9 # m (Coles_refractive_1987)
+        # self.lo = 1e18/au.value  # 1e18m expressed in au (Armstrong_electron_1985)
+        self.lo = 1e18/(self.kpc*1e-3)  # 1e18m expressed in pc (also armstrong_electron_1985 !)
         self.eps = 1
         self.D = d  # kpc - distance to the screen
         self.c = c.value
