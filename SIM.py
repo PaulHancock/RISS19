@@ -10,6 +10,7 @@ import astropy.units as u
 from lib.SM2017 import SM
 from astropy.utils.exceptions import AstropyWarning
 import warnings
+import matplotlib.pyplot as plt
 warnings.filterwarnings("always")
 warnings.simplefilter('ignore', category=AstropyWarning)
 
@@ -17,7 +18,7 @@ datadir = os.path.join(os.path.dirname(__file__), 'data')
 SFG=0
 AGN=1
 stypes=[SFG, AGN]
-sprobs=[0.84839, 1-0.84839]
+sprobs=[0.84839, 1-0.84839] #0.15161
 
 parser = argparse.ArgumentParser()
 
@@ -27,7 +28,7 @@ parser.add_argument('-FLL', action='store', dest='FLL', default=0.001,
                     help='Store lower flux limit (Jy)')
 parser.add_argument('-mc', action='store', dest='mc', default=0.05,
                     help='Store modulation cut off value')
-parser.add_argument('-t', action='store', dest='obs_time', default=183,
+parser.add_argument('-t', action='store', dest='obs_time', default=183.,
                     help='observation time in days')
 parser.add_argument('-a', action='store', dest='a', default=3300.,
                     help='Scaling Constant for source counts')
@@ -195,7 +196,7 @@ class SIM(object):
             elif stype[i] == SFG:
                 ssize_arr.append(30./(3600.*1000.)) #(0.2063/(3600.)) actual values
 
-        return ssize_arr
+        return np.array(ssize_arr)
 
     def file_gen(self,ar1, ar2, ar3, ar4, ar5, output_name):
         """
@@ -207,7 +208,7 @@ class SIM(object):
                              meta={'name': output_name})
         output_table.write(output_name, overwrite=True)
 
-    def output_gen(self, ra, dec, stype, ssize):
+    def output_gen(self, ra, dec, ssize):
         nu = np.float(self.nu)
         frame = 'fk5'
         tab = Table()
@@ -257,7 +258,7 @@ class SIM(object):
         # sm
         #val3, err3 = sm.get_sm(pos)
         # mod
-        val4, err4 = sm.get_m(pos, stype, ssize)
+        val4, err4 = sm.get_m(pos, ssize)
         # t0
         val5, err5 = sm.get_timescale(pos)
         # rms
@@ -273,19 +274,26 @@ class SIM(object):
         stype = self.stype_gen(RA)
         ssize = self.ssize_gen(flux, stype)
         #print('SS')
-        mod, t0, Ha, theta= self.output_gen(RA, DEC, stype, ssize)
-        #print('mod')
+        mod, t0, Ha, theta= self.output_gen(RA, DEC, ssize)
         obs_yrs = self.obs_time / (3600. * 24. * 365.25)
         mcount = 0
         var = []
         for i in range(0, len(t0) - 1):
             if obs_yrs <= t0[i]:
                 mod[i] = mod[i] * (np.float(obs_yrs/t0[i]))
+        #plt.hist(mod, 50)
+        #plt.yscale('log')
+        # plt.xscale('log')
+        #plt.xlim(0, 0.2)
+        #plt.title(str(np.mean(mod)) + "_" + str(len(mod[mod <= self.mod_cutoff])))
+        #plt.savefig('mod_fig2a.png')
+        #plt.show()
+
         for i in range(0, len(mod)):
             if mod[i] >= self.mod_cutoff:
                 mcount = mcount + 1
                 var.append(mod[i])
-        areal = mcount / self.area
+        areal = float(len(var)) / self.area
         return areal, mod, t0, Ha, theta
 
     def repeat(self):
