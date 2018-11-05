@@ -73,6 +73,30 @@ class SM(object):
 
         return
 
+    def get_distance(position):
+        """
+        :param position: sky position
+        :return: Distance to scattering screen in kpc
+        """
+        gal_r = 40  # kpc
+        sun_r = 8  # kpc
+        gal_h = 1  # kpc
+        theta = position.galactic.l.radian  # angle from the GC along the plane
+        phi = position.galactic.b.radian  # angle from the GC perp to the plane
+        far_edge = sun_r * np.cos(theta) + np.sqrt(gal_r ** 2 - sun_r ** 2 * np.sin(theta ** 2))
+        top = 1 / (gal_h / 2 * np.abs(np.sin(phi)))
+        mask = np.where(top > far_edge)
+        screen_dist = top
+        screen_dist[mask] = far_edge[mask]
+        return screen_dist / 2
+
+    def get_rf(self, position):
+        """
+        :param position: Sky position
+        :return: Fresnel scale in m
+        """
+        return np.sqrt(self.c * self.get_distance(position) * self.kpc / (2 * np.pi * self.nu))
+
     def get_halpha(self, position):
         """
         Return the Halpha for a given location on the sky.
@@ -99,8 +123,8 @@ class SM(object):
         """
         iha, err_iha = self.get_halpha(position)
         # Cordes2002
-        sm2 = iha/198 * self.t4**0.9 * self.eps**2/(1+self.eps**2) * self.lo**(-2/3)
-        err_sm2= (err_iha/iha)*sm2
+        sm2 = iha / 198 * self.t4 ** 0.9 * self.eps ** 2 / (1 + self.eps ** 2) * self.lo ** (-2 / 3)
+        err_sm2 = (err_iha / iha) * sm2
         return sm2, err_sm2
 
     def get_rdiff(self, position):
@@ -112,9 +136,10 @@ class SM(object):
         sm2, err_sm2 = self.get_sm(position)
         # ^ units are kpc m^{-20/3}, but we want m^{-17/3} so we have to multiply by kpc below
         # r_diff as per Mcquart & Koay 2013, eq 7a.
-        rdiff = (2**(2-self.beta) * (np.pi * self.re**2 * (self.c/self.nu)**2 * self.beta) * sm2 * self.kpc *
-                 gamma(-self.beta/2)/gamma(self.beta/2))**(1/(2-self.beta))
-        err_rdiff = abs((1/(2-self.beta))*(err_sm2/sm2)*rdiff)
+        rdiff = (2 ** (2 - self.beta) * (
+                    np.pi * self.re ** 2 * (self.c / self.nu) ** 2 * self.beta) * sm2 * self.kpc *
+                 gamma(-self.beta / 2) / gamma(self.beta / 2)) ** (1 / (2 - self.beta))
+        err_rdiff = abs((1 / (2 - self.beta)) * (err_sm2 / sm2) * rdiff)
         return rdiff, err_rdiff
 
     def get_rref(self, position):
@@ -125,7 +150,11 @@ class SM(object):
         """
         # Narayan 1992 eq 4.2
         rdiff, err_rdiff = self.get_rdiff(position)
-        rref = self.rf**2 / rdiff
+        if self.rf == 0:
+            rf = self.get_rf(position)
+        else:
+            rf = self.rf
+        rref = rf ** 2 / rdiff
         err_rref = (err_rdiff / rdiff) * rref
         return rref, err_rref
 
@@ -139,8 +168,12 @@ class SM(object):
         rdiff, err_rdiff = self.get_rdiff(position)
         # Narayan 1992, uses r_F/r_diff = \xi without explicitly stating that this is being done
         # Compare Narayan 1992 eq 3.5 with Walker 1998 eq 6
-        xi = self.rf / rdiff
-        err_xi = (err_rdiff/rdiff)*xi
+        if self.rf == 0:
+            rf = self.get_rf(position)
+        else:
+            rf = self.rf
+        xi = rf / rdiff
+        err_xi = (err_rdiff / rdiff) * xi
         return xi, err_xi
 
     def get_theta(self, position):
@@ -151,8 +184,12 @@ class SM(object):
         """
         # See Narayan 1992 eq 4.10 and discussion immediately prior
         r_ref, err_r_ref = self.get_rref(position)
-        theta = np.degrees(r_ref / (self.D*self.kpc))
-        err_theta = np.degrees(err_r_ref / (self.D*self.kpc))
+        if self.D == 0:
+            D = self.get_distance(position)
+        else:
+            D = self.D
+        theta = np.degrees(r_ref / (D * self.kpc))
+        err_theta = np.degrees(err_r_ref / (D * self.kpc))
         return theta, err_theta
 
     def get_m(self, position, ssize=0):
@@ -164,17 +201,16 @@ class SM(object):
         :return:
         """
         xi, err_xi = self.get_xi(position)
-        theta, err_theta = self.get_theta(position)
-        m = xi ** (-1. / 3.)*(theta / ssize) ** (7. / 6.)
-        err_m = (1. / 3.) * (err_xi / xi) * m * (7. / 6.) * (err_theta / theta)
+        m = xi ** (-1. / 3.)
+        err_m = (1. / 3.) * (err_xi / xi) * m
 
-        #theta, err_theta = self.get_theta(position)
-        #large = np.argwhere(ssize > theta)
-        #m[large] *= (theta[large] / ssize[large]) ** (7. / 6.)
-        #err_m[large] *= (7. / 6.) * (err_theta[large] / theta[large])
+        theta, err_theta = self.get_theta(position)
+        large = np.where(ssize > theta)
+        m[large] *= (theta[large] / ssize[large]) ** (7. / 6.)
+        err_m[large] *= (7. / 6.) * (err_theta[large] / theta[large])
         return m, err_m
 
-    def get_timescale(self, position):
+    def get_timescale(self, position, ssize=0):
         """
         calculate the refractive timescale using parameter ξ for a given sky coord
         timescale is in years
@@ -182,24 +218,37 @@ class SM(object):
         :return:
         """
         xi, err_xi = self.get_xi(position)
-        tref = self.rf *xi / self.v / seconds_per_year
-        err_tref = (err_xi/xi)*tref
+        if self.rf == 0:
+            rf = self.get_rf(position)
+        else:
+            rf = self.rf
+        tref = rf * xi / self.v / seconds_per_year
+        err_tref = (err_xi / xi) * tref
+
+        # timescale is longer for 'large' sources
+        theta, err_theta = self.get_theta(position)
+        large = np.where(ssize > theta)
+        tref[large] *= ssize / theta[large]
+        err_tref[large] *= ssize / theta[large]
         return tref, err_tref
 
     def get_rms_var(self, position, stype=AGN, ssize=0, nyears=1):
         """
-        calculate the expected RMS variation in nyears at a given sky coord
-        rms variability is fraction/year
+        calculate the expected modulation index observed when measured on nyears timescales
+        at a given sky coord
         :param position: astropy.coordinates.SkyCoord
         :param nyears: timescale of interest
+        :param ssize: source size in deg
         :return:
         """
-        tref, err_tref=self.get_timescale(position)
-        m, err_m = self.get_m(position, stype, ssize)
-        #basic uncertainty propagation, can probably change.
-        t = m/tref * nyears
-        err_t = ((err_m/m)+(err_tref/tref))*t
-        return t, err_t
+
+        tref, err_tref = self.get_timescale(position, ssize=ssize)
+        m, err_m = self.get_m(position, ssize=ssize)
+
+        short = np.where(nyears * seconds_per_year < tref)
+        m[short] *= (nyears * seconds_per_year / tref[short])
+        err_m[short] *= (nyears * seconds_per_year / tref[short])
+        return m, err_m
 
     def get_vo(self, position):
         """
@@ -210,9 +259,14 @@ class SM(object):
         sm2, _ = self.get_sm(position)
         pow = (1 / (2 - self.beta))
         A = (2 ** (2 - self.beta) * (np.pi * self.re ** 2 * self.beta) * sm2 * self.kpc *
-                gamma(-self.beta / 2) / gamma(self.beta / 2)) ** pow
-        vo = self.c * (np.sqrt(self.D*self.kpc/(2*np.pi)) / A)**(1/(0.5 - 2*pow))
-        return vo/1e9
+             gamma(-self.beta / 2) / gamma(self.beta / 2)) ** pow
+        if self.D == 0:
+            D = self.get_distance(position)
+        else:
+            D = self.D
+        vo = self.c * (np.sqrt(D * self.kpc / (2 * np.pi)) / A) ** (1 / (0.5 - 2 * pow))
+
+        return vo / 1e9
 
 def test_all_params():
     print("Testing with single positions")
