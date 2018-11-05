@@ -192,7 +192,7 @@ class SIM(object):
         ssize_arr = []
         for i in range(0, len(stype)):
             if stype[i] == AGN:
-                ssize_arr.append(0.25/(3600.*1000.)) #(0.0979/(3600.)) actual values
+                ssize_arr.append(2./(3600.*1000.)) #(0.0979/(3600.)) actual values
             elif stype[i] == SFG:
                 ssize_arr.append(30./(3600.*1000.)) #(0.2063/(3600.)) actual values
 
@@ -281,10 +281,11 @@ class SIM(object):
         for i in range(0, len(t0) - 1):
             if obs_yrs <= t0[i]:
                 mod[i] = mod[i] * (np.float(obs_yrs/t0[i]))
+        #print(np.mean(mod))
         #plt.hist(mod, 50)
         #plt.yscale('log')
-        # plt.xscale('log')
-        #plt.xlim(0, 0.2)
+        #plt.xscale('log')
+        #plt.xlim(0, 2.5)
         #plt.title(str(np.mean(mod)) + "_" + str(len(mod[mod <= self.mod_cutoff])))
         #plt.savefig('mod_fig2a.png')
         #plt.show()
