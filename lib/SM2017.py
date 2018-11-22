@@ -73,7 +73,7 @@ class SM(object):
 
         return
 
-    def get_distance(position):
+    def get_distance(self,position):
         """
         :param position: sky position
         :return: Distance to scattering screen in kpc
@@ -88,7 +88,7 @@ class SM(object):
         mask = np.where(top > far_edge)
         screen_dist = top
         screen_dist[mask] = far_edge[mask]
-        return screen_dist / 2
+        return screen_dist / 2.0
 
     def get_rf(self, position):
         """
