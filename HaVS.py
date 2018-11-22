@@ -218,7 +218,7 @@ class SIM(object):
         # make the SM object
         sm = SM(ha_file=os.path.join(datadir, 'Halpha_map.fits'),
                 err_file=os.path.join(datadir, 'Halpha_error.fits'),
-                nu=nu)
+                nu=nu, d=0)
         """
         # halpha
         val, err = sm.get_halpha(pos)
@@ -295,6 +295,7 @@ class SIM(object):
                 mcount = mcount + 1
                 var.append(mod[i])
         areal = float(len(var)) / self.area
+        #print(len(var))
         return areal, mod, t0, Ha, theta
 
     def repeat(self):
@@ -362,11 +363,10 @@ def test():
         resultstab.add_column(Column(data=Params, name='Parameters'))
         resultstab.add_column(Column(data=Param_vals, name='Values'))
         resultstab.write(resultsfile, overwrite=True)
-
-    print("Array: {0}".format(areal_arr))
+    if outfile== False:
+        print("Array: {0}".format(areal_arr))
     print("Avg Areal: {0}".format(np.mean(areal_arr)))
-    if len(areal_arr)<=20:
-        print("Iterations: {0}".format(len(areal_arr)))
+    print("Iterations: {0}".format(len(areal_arr)))
     print("Num Sources: {0}".format(np.mean(NSources)))
     print("Area: {0}".format(area))
     print("Num Variable: {0}".format(np.mean(areal_arr)*area))
