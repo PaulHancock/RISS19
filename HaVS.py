@@ -58,19 +58,18 @@ class SIM(object):
             self.log=log
         #Variables
         self.figure=results.figure
-        self.nu = np.float(results.nu) * 1e6
+        self.nu = np.float(results.nu) * 1e6 #Hz, Default 185 MHz
         self.arcsec = np.pi / (180. * 3600.)
-        self.mod_cutoff = np.float(results.mc)
-        self.low_Flim = np.float(results.FLL)  # Jy
-        self.upp_Flim = np.float(results.FUL) # Jy
+        self.mod_cutoff = np.float(results.mc) #Default 0.05
+        self.low_Flim = np.float(results.FLL)  # Jy, Default 0.001 Jy
+        self.upp_Flim = np.float(results.FUL) # Jy, Default 1 Jy
         self.region_name = results.region_name
-        #self.region_name=('testreg.mim')
         region=cPickle.load(open(self.region_name, 'rb'))
         self.area = region.get_area(degrees=True)
-        self.obs_time = np.float(results.obs_time) * 24. * 60. * 60.
-        self.loops=np.int(results.loops)
+        self.obs_time = np.float(results.obs_time) * 24. * 60. * 60. # seconds, Default 183 days
+        self.loops=np.int(results.loops) #Default 20
         self.num_scale=40
-        self.a=np.float(results.a)
+        self.a=np.float(results.a) #Default 3300
 
     def flux_gen(self):
         """
@@ -80,10 +79,12 @@ class SIM(object):
         """
         low=self.low_Flim
         upp=self.upp_Flim
+        #Function that finds dN = (alpha * [Flux] ** (1-b))/ 1-b
         def dn_func(val, a, b):
             output = (a * val ** (1.0 - b)) / (1.0 - b)
             return output
-
+        #Takes input of lower flux, upper flux, a and b values to create differentail flux counts in that range.
+        #Main outputs: Bins, Ni.
         def diff_counts(a, b, low, upp):
             low=np.log10(low)
             upp=np.log10(upp)
@@ -98,7 +99,7 @@ class SIM(object):
             Ni = np.array(Ni)
             mpoint = np.array(mpoint)
             dS = np.array(dS)
-            dNdS= Ni / dS  # * mpoint**2.5
+            dNdS= Ni / dS
             return bins, dNdS, mpoint, Ni, dS
 
         a = self.a
@@ -117,8 +118,8 @@ class SIM(object):
     def pos_gen(self):
         """
         A function to generate a number of random points in RA/DEC
-        Input:  Number of points to generate
-        Output: List of RA/DEC (2,1) array
+        Input:  Number of points to generate from flux_gen function
+        Output: List of RA/DEC (2,1) array in (2D) Cartesian coordiantes.
         """
         num=self.flux_gen()[1]
         num=num*self.num_scale
@@ -128,10 +129,12 @@ class SIM(object):
         z = []
         r = []
         i = 0
+        #Generating cube
         x1 = np.array(np.random.uniform(-1.0, 1.0, lim))
         y1 = np.array(np.random.uniform(-1.0, 1.0, lim))
         z1 = np.array(np.random.uniform(-1.0, 1.0, lim))
         rad = (x1 ** 2.0 + y1 ** 2.0 + z1 ** 2.0) ** (0.5)
+        #Getting points inside sphere of radius 1
         for i in range(0, len(rad)):
             if rad[i] <= 1.:
                 x.append(x1[i])
@@ -140,6 +143,7 @@ class SIM(object):
                 r.append(rad[i])
         x, y, z = np.array(x) / np.array(r), np.array(y) / np.array(r), np.array(z) / np.array(r)
         r0 = (x ** 2.0 + y ** 2.0 + z ** 2.0) ** 0.5
+        #converting back to cartesian cooridantes
         theta = np.arccos(z / r0) * 180 / np.pi
         theta = theta - 90.
         theta = theta[:num]
@@ -173,18 +177,18 @@ class SIM(object):
 
     def stype_gen(self,arr):
         """
-        Function to determine if a source is of type AGN or SFR
+        Function to determine if a source is of type compact or extended
         Input:  RA/DEC list (source_size?)
-        Output: AGN (1?) or SFR (0?)
+        Output: compact (1?) or extended (0?)
         """
         stype_arr = []
         for i in range(0, len(arr)):
             stype_arr.append(np.random.choice(stypes, p=sprobs))
         return stype_arr
 
-    def ssize_gen(self,flux, stype):
+    def ssize_gen(self, stype):
         """
-        Generates source size based on flux and stype given.
+        Generates source size based stype given.
         Input: Flux and source type
         Output: Source size
         """
@@ -192,23 +196,20 @@ class SIM(object):
         ssize_arr = []
         for i in range(0, len(stype)):
             if stype[i] == AGN:
+                # 2 milli arc secs
                 ssize_arr.append(2./(3600.*1000.)) #(0.0979/(3600.)) actual values
             elif stype[i] == SFG:
+                # 30 milli arc secs
                 ssize_arr.append(30./(3600.*1000.)) #(0.2063/(3600.)) actual values
 
         return np.array(ssize_arr)
 
-    def file_gen(self,ar1, ar2, ar3, ar4, ar5, output_name):
-        """
-        Function to create output csv file for required data
-        Input: arrays for RA/DEC
-        Output: CSV file
-        """
-        output_table = Table([ar1, ar2, ar3, ar4, ar5], names=('RA', 'DEC', 'Flux', 'stype', 'ssize'),
-                             meta={'name': output_name})
-        output_table.write(output_name, overwrite=True)
-
     def output_gen(self, ra, dec, ssize):
+        """
+        Function to use SM2017 to get Modulation, Timescale, Halpha, Theta and other values.
+        Input: RA, DEC, Source Size
+        Output: Modulation, Timescale, Halpha, Theta
+        """
         nu = np.float(self.nu)
         frame = 'fk5'
         tab = Table()
@@ -219,39 +220,7 @@ class SIM(object):
         sm = SM(ha_file=os.path.join(datadir, 'Halpha_map.fits'),
                 err_file=os.path.join(datadir, 'Halpha_error.fits'),
                 nu=nu, d=0)
-        """
-        # halpha
-        val, err = sm.get_halpha(pos)
-        tab.add_column(Column(data=val, name='Halpha'))
-        tab.add_column(Column(data=err, name='err_Halpha'))
-        # xi
-        val, err = sm.get_xi(pos)
-        tab.add_column(Column(data=val, name='xi'))
-        tab.add_column(Column(data=err, name='err_xi'))
-        # sm
-        val, err = sm.get_sm(pos)
-        tab.add_column(Column(data=val, name='sm'))
-        tab.add_column(Column(data=err, name='err_sm'))
-        # mod
-        val, err = sm.get_m(pos, stype, ssize)
-        tab.add_column(Column(data=val, name='m'))
-        tab.add_column(Column(data=err, name='err_m'))
-        # t0
-        val, err = sm.get_timescale(pos)
-        tab.add_column(Column(data=val, name='t0'))
-        tab.add_column(Column(data=err, name='err_t0'))
-        # rms
-        val, err = sm.get_rms_var(pos, stype, ssize)
-        tab.add_column(Column(data=val, name='rms1yr'))
-        tab.add_column(Column(data=err, name='err_rms1yr'))
-        # theta
-        val, err = sm.get_theta(pos)
-        tab.add_column(Column(data=val, name='theta_r'))
-        tab.add_column(Column(data=err, name='err_theta_r'))
-        #tab.write(self.output_name, overwrite=True)
-        return tab['m'], tab['t0'], tab['Halpha'], tab['theta_r']
-        """
-        # Ha
+        # Halpha
         val1, err1 = sm.get_halpha(pos)
         # xi
         #val2, err2 = sm.get_xi(pos)
@@ -266,9 +235,14 @@ class SIM(object):
         # theta
         val7, err7 = sm.get_theta(pos)
         return val4, val5, val1, val7
+
     def areal_gen(self):
+        """
+        Function to generate the areal sky density (ASD) values
+        Uses: Flux, Region, Stype, Ssize, Output (Ha, mod, t0, theta), Obs_Yrs
+        Output: ASD, modulation, timescale, Ha, Theta
+        """
         flux, num = self.flux_gen()
-        #print('flux', flux, num)
         RA, DEC = self.region_gen(self.region_name)
         #print('RA')
         stype = self.stype_gen(RA)
@@ -281,31 +255,27 @@ class SIM(object):
         for i in range(0, len(t0) - 1):
             if obs_yrs <= t0[i]:
                 mod[i] = mod[i] * (np.float(obs_yrs/t0[i]))
-        #print(np.mean(mod))
-        #plt.hist(mod, 50)
-        #plt.yscale('log')
-        #plt.xscale('log')
-        #plt.xlim(0, 2.5)
-        #plt.title(str(np.mean(mod)) + "_" + str(len(mod[mod <= self.mod_cutoff])))
-        #plt.savefig('mod_fig2a.png')
-        #plt.show()
 
         for i in range(0, len(mod)):
             if mod[i] >= self.mod_cutoff:
                 mcount = mcount + 1
                 var.append(mod[i])
         areal = float(len(var)) / self.area
-        #print(len(var))
         return areal, mod, t0, Ha, theta
 
     def repeat(self):
+        """
+        Function to repeate the ASD calculation
+        Input: Number of iterations set at beginning
+        Output: Arrays of Modulation, Timescale, Halpha, Theta as well as other statistics.
+        """
         areal_arr = []
-        mod_arr=np.empty((self.loops,2))
-        t0_arr=np.empty((self.loops,2))
-        Ha_arr=np.empty((self.loops,2))
-        theta_arr=np.empty((self.loops,2))
-        NSources=[]
-        count=0
+        mod_arr = np.empty((self.loops,2))
+        t0_arr = np.empty((self.loops,2))
+        Ha_arr = np.empty((self.loops,2))
+        theta_arr = np.empty((self.loops,2))
+        NSources = []
+        count = 0
 
         for i in range(0, self.loops):
             INPUT = self.areal_gen()
@@ -316,22 +286,24 @@ class SIM(object):
             theta_arr[i,:]=[np.mean(INPUT[4]), np.std(INPUT[4])]
             count=count+1
             NSources.append(len(INPUT[1]))
-        areal_arr=np.array(areal_arr)
-        NSources= np.array(NSources)
-        #if self.figure != False:
-        #    plt.hist(areal_arr,10)
-        #    plt.savefig('ASD_sim.png')
-        #    plt.show()
+        areal_arr = np.array(areal_arr)
+        NSources = np.array(NSources)
 
         return areal_arr, mod_arr,t0_arr, Ha_arr, theta_arr, count, NSources, self.area, self.low_Flim, self.upp_Flim, self.obs_time, self.nu, self.mod_cutoff
 
 
 def test():
+    """
+    This section collects runs the previous functions and outputs them to two different files.
+    Data file: Includes raw data from each iteration.
+    Results file: Returns averaged results.
+    """
+
     sim=SIM()
     areal_arr, mod_arr, t0_arr, Ha_arr, theta_arr, count, NSources, area, low_Flim, upp_Flim, obs_time, nu, mod_cutoff=sim.repeat()
     datatab=Table()
     resultstab=Table()
-    if outfile!= False:
+    if outfile != False:
         datafile=outfile[:-4]+'_data'+outfile[-4:]
         ### DATA FILE
         datatab.add_column(Column(data=np.arange(1,len(areal_arr)+1,1), name='Interations'))
@@ -348,14 +320,14 @@ def test():
 
         ##RESUTLS FILE
         resultsfile = outfile[:-4] + '_results' + outfile[-4:]
-        Stats=['H_Alpha Mean','H_Alpha STD', 'Modulation Mean', 'Modulation STD', 'Timescale Mean (yrs)', 'Timescale STD (yrs)',
+        Stats = ['H_Alpha Mean','H_Alpha STD', 'Modulation Mean', 'Modulation STD', 'Timescale Mean (yrs)', 'Timescale STD (yrs)',
                'Theta Mean (deg)', 'Theta STD (deg)', 'Areal Sky Desnity Mean',  'Areal Sky Desnity STD']
-        Stats_vals=[np.mean(Ha_arr[:,0]),np.std(Ha_arr[:,0]),np.mean(mod_arr[:,0]),np.std(mod_arr[:,0]),
+        Stats_vals = [np.mean(Ha_arr[:,0]),np.std(Ha_arr[:,0]),np.mean(mod_arr[:,0]),np.std(mod_arr[:,0]),
                     np.mean(t0_arr[:,0]),np.std(t0_arr[:,0]), np.mean(theta_arr[:,0]),np.std(theta_arr[:,0]),
                     np.mean(areal_arr), np.std(areal_arr)]
-        Params=['Avg # Sources', 'Avg Variables','Area (deg^2)', 'Lower Flux Limit (Jy)', 'Upper Flux Limit (Jy)', 'Observation time (days)', 'Frequency (MHz)', 'Modulation Cutoff']
+        Params = ['Avg # Sources', 'Avg Variables','Area (deg^2)', 'Lower Flux Limit (Jy)', 'Upper Flux Limit (Jy)', 'Observation time (days)', 'Frequency (MHz)', 'Modulation Cutoff']
         Params.extend(["",""])
-        Param_vals=[np.mean(NSources),area*np.mean(areal_arr), area, low_Flim, upp_Flim, obs_time/(24.*3600.), nu/(1E6), mod_cutoff]
+        Param_vals =[ np.mean(NSources),area*np.mean(areal_arr), area, low_Flim, upp_Flim, obs_time/(24.*3600.), nu/(1E6), mod_cutoff]
         Param_vals.extend(["", ""])
 
         resultstab.add_column(Column(data=Stats, name='Statistics'))
@@ -363,7 +335,7 @@ def test():
         resultstab.add_column(Column(data=Params, name='Parameters'))
         resultstab.add_column(Column(data=Param_vals, name='Values'))
         resultstab.write(resultsfile, overwrite=True)
-    if outfile== False:
+    if outfile == False:
         print("Array: {0}".format(areal_arr))
     print("Avg Areal: {0}".format(np.mean(areal_arr)))
     print("Iterations: {0}".format(len(areal_arr)))
