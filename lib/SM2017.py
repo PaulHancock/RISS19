@@ -238,9 +238,9 @@ class SM(object):
         tref, err_tref=self.get_timescale(position, ssize=ssize)
         m, err_m = self.get_m(position, ssize=ssize)
 
-        short = np.where(nyears*seconds_per_year < tref)
-        m[short] *= (nyears*seconds_per_year/tref[short])
-        err_m[short] *= (nyears*seconds_per_year/tref[short])
+        short = np.where(nyears < tref)
+        m[short] *= (nyears/tref[short])
+        err_m[short] *= (nyears/tref[short])
         return m, err_m
 
     def get_vo(self, position):
