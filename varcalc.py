@@ -23,8 +23,6 @@ logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("varcalc")
 log.setLevel(logging.INFO)
 
-__author__ = 'Paul Hancock'
-__date__ = '2017-03-02'
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

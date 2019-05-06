@@ -17,8 +17,8 @@ import os
 import logging
 from scipy.special import gamma
 
-__author__ = 'Paul Hancock'
-__date__ = '2017-02-23'
+__author__ = ['Paul Hancock', 'Elliott Charlton']
+__date__ = '2019-05-06'
 SFG=0
 AGN=1
 
