@@ -46,6 +46,8 @@ if __name__ == "__main__":
                         help='Calculate the transition frequency (GHz)')
     group1.add_argument('-f', '--fzero', dest='fzero', action='store_true', default=False,
                         help='Calculate the Fresnel zone (deg)')
+    group1.add_argument('--distance', dest='dist', action='store_true', default=False,
+                        help='Calculate the model distance')
     group1.add_argument('--all', dest='do_all', action='store_true', default=False,
                         help='Include all parameters')
 
@@ -81,6 +83,7 @@ if __name__ == "__main__":
     if results.do_all:
         results.halpha = results.sm = results.m = results.rms = True
         results.xi = results.t0 = results.theta = results.nuzero = results.fzero = True
+        results.dist = True
 
     # data is stored in the data dir, relative to *this* file
     datadir = os.path.join(os.path.dirname(__file__), 'data')
@@ -178,6 +181,9 @@ if __name__ == "__main__":
             val,err=sm.get_halpha(pos)
             tab.add_column(Column(data=val, name='Halpha'))
             tab.add_column(Column(data=err, name='err_Halpha'))
+        if results.dist:
+            val =sm.get_distance(pos)
+            tab.add_column(Column(data=val, name='Distance'))
         if results.xi:
             val, err = sm.get_xi(pos)
             tab.add_column(Column(data=val, name='xi'))
@@ -210,8 +216,3 @@ if __name__ == "__main__":
             tab.add_column(Column(data=val, name='D'))
         print("Writing to {0}".format(results.outfile))
         tab.write(results.outfile, overwrite=True)
-
-
-
-
-
