@@ -46,7 +46,7 @@ if __name__ == "__main__":
                         help='Calculate the transition frequency (GHz)')
     group1.add_argument('-f', '--fzero', dest='fzero', action='store_true', default=False,
                         help='Calculate the Fresnel zone (deg)')
-    group1.add_argument('--distance', dest='dist', action='store_true', default=False,
+    group1.add_argument('--dist', dest='dist', action='store_true', default=False,
                         help='Calculate the model distance')
     group1.add_argument('--all', dest='do_all', action='store_true', default=False,
                         help='Include all parameters')
@@ -70,8 +70,6 @@ if __name__ == "__main__":
     group3 = parser.add_argument_group('Input parameter settings')
     group3.add_argument('--freq', dest='frequency', default=185, type=float,
                         help="Frequency in MHz")
-    group3.add_argument('--dist', dest='distance', default=1, type=float,
-                        help="Distance to scattering screen in kpc")
     group3.add_argument('--vel', dest='velocity', default=10, type=float,
                         help="Relative motion of screen and observer in km/s")
 
@@ -88,9 +86,8 @@ if __name__ == "__main__":
     # data is stored in the data dir, relative to *this* file
     datadir = os.path.join(os.path.dirname(__file__), 'data')
 
-    nu = results.frequency*1e6
-    d = results.distance
-    v = results.velocity * 1e3
+    nu = results.frequency*1e6 # GHz
+    v = results.velocity * 1e3 # km/s
     # For doing a one off position calculation
 
     if results.pos is None and results.infile is None:
@@ -112,7 +109,6 @@ if __name__ == "__main__":
                 err_file=os.path.join(datadir, 'Halpha_error.fits'),
                 nu=nu,
                 log=log,
-                d=d,
                 v=v)
         if results.halpha:
             logging.debug(sm.get_halpha(pos))
@@ -146,11 +142,9 @@ if __name__ == "__main__":
         if results.nuzero:
             val = sm.get_vo(pos)
             print("nu0: ", val, "GHz")
-        if d == 0:
-            d = sm.get_distance(pos)
-            print("D: ", d, "kpc")
-            rf = sm.get_rf(pos)
-            print("theta_F0: ", np.degrees(rf/(d*sm.kpc)), "deg")
+        if results.dist:
+            val = sm.get_distance(pos)
+            print("distance: ", val, "kpc")
         sys.exit(0)
 
     if results.infile:
@@ -168,7 +162,6 @@ if __name__ == "__main__":
                 err_file=os.path.join(datadir, 'Halpha_error.fits'),
                 nu=nu,
                 log=log,
-                d=d,
                 v=v)
         # make a new table for writing and copy the ra/dec unless we are appending to the old file
         if not results.append:
@@ -211,8 +204,5 @@ if __name__ == "__main__":
         if results.nuzero:
             val = sm.get_vo(pos)
             tab.add_column(Column(data=val, name='nu0'))
-        if d == 0:
-            val = sm.get_distance(pos)
-            tab.add_column(Column(data=val, name='D'))
         print("Writing to {0}".format(results.outfile))
         tab.write(results.outfile, overwrite=True)
