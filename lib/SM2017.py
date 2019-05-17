@@ -51,7 +51,7 @@ class SM(object):
         # self.lo = 1e18/au.value  # 1e18m expressed in au (Armstrong_electron_1985)
         self.lo = 1e18/(self.kpc*1e-3)  # 1e18m expressed in pc (also armstrong_electron_1985 !)
         self.eps = 1
-        self.D = d  # kpc - distance to the screen
+        # self.D = d  # kpc - distance to the screen
         self.c = c.value
         self.beta = 11/3
         self.re = 2.817e-15  # m
@@ -81,8 +81,6 @@ class SM(object):
         :param position: sky position
         :return: Distance to scattering screen in kpc
         """
-        if self.D is not None:
-            return np.ones(np.shape(position))*self.D
         gal_r = 40  # kpc
         sun_r = 8   # kpc
         gal_h = 1   # kpc
