@@ -28,23 +28,23 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     group1 = parser.add_argument_group('Output parameter selection')
-    group1.add_argument('-H', '--Halpha', dest='halpha', action='store_true', default=False,
+    group1.add_argument('--Halpha', dest='halpha', action='store_true', default=False,
                         help='Calculate Hα intensity (Rayleighs)')
-    group1.add_argument('-x', '--xi', dest='xi', action='store_true', default=False,
+    group1.add_argument('--xi', dest='xi', action='store_true', default=False,
                         help='Calculate ξ (dimensionless)')
-    group1.add_argument('-m', '--modulation', dest='m', action='store_true', default=False,
+    group1.add_argument('--modulation', dest='m', action='store_true', default=False,
                         help='Calculate modulation index (fraction)')
-    group1.add_argument('-s', '--sm', dest='sm', action='store_true', default=False,
+    group1.add_argument('--sm', dest='sm', action='store_true', default=False,
                         help='Calculate scintillation measure (kpc m^{-20/3})')
-    group1.add_argument('-t', '--timescale', dest='t0', action='store_true', default=False,
+    group1.add_argument('--timescale', dest='t0', action='store_true', default=False,
                         help='Calculate timescale of variability (years)')
-    group1.add_argument('-r', '--rms', dest='rms', action='store_true', default=False,
+    group1.add_argument('--rms', dest='rms', action='store_true', default=False,
                         help='Calculate rms variability over 1 year (fraction/year)')
-    group1.add_argument('-d', '--theta', dest='theta', action='store_true', default=False,
+    group1.add_argument('--theta', dest='theta', action='store_true', default=False,
                         help='Calculate the scattering disk size (deg)')
-    group1.add_argument('-v', '--nuzero', dest='nuzero', action='store_true', default=False,
+    group1.add_argument('--nuzero', dest='nuzero', action='store_true', default=False,
                         help='Calculate the transition frequency (GHz)')
-    group1.add_argument('-f', '--fzero', dest='fzero', action='store_true', default=False,
+    group1.add_argument('--fzero', dest='fzero', action='store_true', default=False,
                         help='Calculate the Fresnel zone (deg)')
     group1.add_argument('--dist', dest='dist', action='store_true', default=False,
                         help='Calculate the model distance')
@@ -70,6 +70,8 @@ if __name__ == "__main__":
     group3 = parser.add_argument_group('Input parameter settings')
     group3.add_argument('--freq', dest='frequency', default=185, type=float,
                         help="Frequency in MHz")
+    group3.add_argument('--dist_in', dest='dist_in', type=float, default=None,
+                        help="Distance to scattering screen in kpc")
     group3.add_argument('--vel', dest='velocity', default=10, type=float,
                         help="Relative motion of screen and observer in km/s")
 
@@ -88,6 +90,7 @@ if __name__ == "__main__":
 
     nu = results.frequency*1e6 # GHz
     v = results.velocity * 1e3 # km/s
+    d = results.dist_in # kpc
     # For doing a one off position calculation
 
     if results.pos is None and results.infile is None:
@@ -109,6 +112,7 @@ if __name__ == "__main__":
                 err_file=os.path.join(datadir, 'Halpha_error.fits'),
                 nu=nu,
                 log=log,
+                d=d,
                 v=v)
         if results.halpha:
             logging.debug(sm.get_halpha(pos))
@@ -162,6 +166,7 @@ if __name__ == "__main__":
                 err_file=os.path.join(datadir, 'Halpha_error.fits'),
                 nu=nu,
                 log=log,
+                d=d,
                 v=v)
         # make a new table for writing and copy the ra/dec unless we are appending to the old file
         if not results.append:
@@ -171,11 +176,11 @@ if __name__ == "__main__":
         else:
             print("Appending results to existing table")
         if results.halpha:
-            val,err=sm.get_halpha(pos)
+            val, err=sm.get_halpha(pos)
             tab.add_column(Column(data=val, name='Halpha'))
             tab.add_column(Column(data=err, name='err_Halpha'))
         if results.dist:
-            val =sm.get_distance(pos)
+            val = sm.get_distance(pos)
             tab.add_column(Column(data=val, name='Distance'))
         if results.xi:
             val, err = sm.get_xi(pos)
