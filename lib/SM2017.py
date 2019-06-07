@@ -18,11 +18,9 @@ import logging
 from scipy.special import gamma
 
 __author__ = ['Paul Hancock', 'Elliott Charlton']
-__date__ = '2019-05-06'
-SFG=0
-AGN=1
+__date__ = '2019-06-07'
 
-seconds_per_year = 3600 * 24 * 365.25
+SECONDS_PER_YEAR = 3600 * 24 * 365.25
 
 class SM(object):
     """
@@ -47,17 +45,13 @@ class SM(object):
         self.nu = nu  # Hz
         self.kpc = kpc.value  # in m
         self.t4 = 0.8  # t/1e4 K
-        # self.lo = 1e9 # m (Coles_refractive_1987)
-        # self.lo = 1e18/au.value  # 1e18m expressed in au (Armstrong_electron_1985)
         self.lo = 1e18/(self.kpc*1e-3)  # 1e18m expressed in pc (also armstrong_electron_1985 !)
         self.eps = 1
         self.D = d  # kpc - distance to the screen
         self.c = c.value
         self.beta = 11/3
         self.re = 2.817e-15  # m
-        # self.rf = np.sqrt(self.c * self.D * self.kpc / (2*np.pi*self.nu))  # Fresnel scale
         self.v = v  # relative velocity of source/observer in m/s
-        #self.log.debug("data:{0} err:{1}".format(ha_file,err_file))
         self.file = ha_file
         self.err_file = err_file
         self._load_file()
@@ -67,7 +61,7 @@ class SM(object):
         self.wcs = WCS(self.hdu)
         self.data = fits.open(self.file, memmap=True, ignore_missing_end=True)[0].data
         if self.err_file:
-            self.err_hdu = fits.getheader(self.err_file,ignore_missing_end=True)
+            self.err_hdu = fits.getheader(self.err_file, ignore_missing_end=True)
             self.err_wcs = WCS(self.err_hdu)
             self.err_data = fits.open(self.err_file, memmap=True, ignore_missing_end=True)[0].data
         else:
@@ -90,7 +84,7 @@ class SM(object):
         phi = position.galactic.b.radian   # angle from the GC perp to the plane
         far_edge = sun_r*np.cos(theta) + np.sqrt(gal_r**2 - sun_r**2*np.sin(theta**2))
         top = 1 / (gal_h/2 * np.abs(np.sin(phi)))
-        mask = np.where( top>far_edge)
+        mask = np.where(top > far_edge)
         screen_dist = top
         screen_dist[mask] = far_edge[mask]
         return screen_dist/2
@@ -187,11 +181,10 @@ class SM(object):
         err_theta = np.degrees(err_r_ref / (D*self.kpc))
         return theta, err_theta
 
-    def get_m(self, position, stype=AGN, ssize=0):
+    def get_m(self, position, ssize=0):
         """
         calculate the modulation index using parameter ξ for a given sky coord
         :param position: astropy.coordinates.SkyCoord
-        :param stype: Ignored
         :param ssize: source size in deg
         :return:
         """
@@ -211,11 +204,12 @@ class SM(object):
         calculate the refractive timescale using parameter ξ for a given sky coord
         timescale is in years
         :param position: astropy.coordinates.SkyCoord
+        :param ssize: source size in deg
         :return:
         """
         xi, err_xi = self.get_xi(position)
         rf = self.get_rf(position)
-        tref = rf *xi / self.v / seconds_per_year
+        tref = rf * xi / self.v / SECONDS_PER_YEAR
         err_tref = (err_xi/xi)*tref
 
         # timescale is longer for 'large' sources
@@ -225,13 +219,13 @@ class SM(object):
         err_tref[large] *= ssize/theta[large]
         return tref, err_tref
 
-    def get_rms_var(self, position, stype=AGN, ssize=0, nyears=1):
+    def get_rms_var(self, position, ssize=0, nyears=1):
         """
         calculate the expected modulation index observed when measured on nyears timescales
         at a given sky coord
         :param position: astropy.coordinates.SkyCoord
-        :param nyears: timescale of interest
         :param ssize: source size in deg
+        :param nyears: timescale of interest
         :return:
         """
 
