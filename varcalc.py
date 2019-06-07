@@ -32,13 +32,13 @@ if __name__ == "__main__":
                         help='Calculate Hα intensity (Rayleighs)')
     group1.add_argument('--xi', dest='xi', action='store_true', default=False,
                         help='Calculate ξ (dimensionless)')
-    group1.add_argument('--modulation', dest='m', action='store_true', default=False,
+    group1.add_argument('--mod', dest='m', action='store_true', default=False,
                         help='Calculate modulation index (fraction)')
     group1.add_argument('--sm', dest='sm', action='store_true', default=False,
                         help='Calculate scintillation measure (kpc m^{-20/3})')
     group1.add_argument('--timescale', dest='t0', action='store_true', default=False,
                         help='Calculate timescale of variability (years)')
-    group1.add_argument('--rms', dest='rms', action='store_true', default=False,
+    group1.add_argument('--rms1y', dest='rms', action='store_true', default=False,
                         help='Calculate rms variability over 1 year (fraction/year)')
     group1.add_argument('--theta', dest='theta', action='store_true', default=False,
                         help='Calculate the scattering disk size (deg)')
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     group1.add_argument('--dist', dest='dist', action='store_true', default=False,
                         help='Calculate the model distance')
     group1.add_argument('--all', dest='do_all', action='store_true', default=False,
-                        help='Include all parameters')
+                        help='Include all of the above parameter calculations')
 
     group2 = parser.add_argument_group('Input and output data')
     group2.add_argument('--in', dest='infile', default=None, type=argparse.FileType('r'),
