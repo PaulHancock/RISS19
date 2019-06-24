@@ -77,8 +77,8 @@ class SM(object):
         """
         if self.D is not None:
             return np.ones(np.shape(position))*self.D
-        gal_r = 40  # kpc
-        sun_r = 8   # kpc
+        gal_r = 16.2  # kpc
+        sun_r = 8.09  # kpc
         gal_h = 1   # kpc
         theta = position.galactic.l.radian # angle from the GC along the plane
         phi = position.galactic.b.radian   # angle from the GC perp to the plane
