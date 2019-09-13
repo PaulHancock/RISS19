@@ -78,17 +78,20 @@ class SM(object):
         :param position: sky position
         :return: Distance to scattering screen in kpc
         """
-        gal_r = 40  # kpc
-        sun_r = 8  # kpc
-        gal_h = 1  # kpc
+        gal_r = 40.  # kpc
+        sun_r = 8.   # kpc
+        gal_h = 1.   # kpc
         theta = position.galactic.l.radian  # angle from the GC along the plane
         phi = position.galactic.b.radian  # angle from the GC perp to the plane
-        far_edge = sun_r * np.cos(theta) + np.sqrt(gal_r ** 2 - sun_r ** 2 * np.sin(theta ** 2))
-        top = 1 / (gal_h / 2 * np.abs(np.sin(phi)))
-        mask = np.where(top > far_edge)
+        far_edge = sun_r*np.cos(theta) + np.sqrt(gal_r**2. - sun_r**2.*np.sin(theta**2.))
+        top =  (gal_h/2. / np.abs(np.sin(phi)))
+        mask = np.where(top>far_edge)
         screen_dist = top
-        screen_dist[mask] = far_edge[mask]
-        return screen_dist / 2.0
+        if len(mask[0])>=1:
+            screen_dist[mask] = far_edge[mask]
+        
+        return 1.0
+
 
     def get_rf(self, position):
         """
@@ -206,8 +209,9 @@ class SM(object):
 
         theta, err_theta = self.get_theta(position)
         large = np.where(ssize > theta)
-        m[large] *= (theta[large] / ssize[large]) ** (7. / 6.)
-        err_m[large] *= (7. / 6.) * (err_theta[large] / theta[large])
+        if len(large[0])>=1:
+            m[large] *= (theta[large] / ssize[large]) ** (7. / 6.)
+            err_m[large] *= (7. / 6.) * (err_theta[large] / theta[large])
         return m, err_m
 
     def get_timescale(self, position, ssize=0):
@@ -228,8 +232,9 @@ class SM(object):
         # timescale is longer for 'large' sources
         theta, err_theta = self.get_theta(position)
         large = np.where(ssize > theta)
-        tref[large] *= ssize / theta[large]
-        err_tref[large] *= ssize / theta[large]
+        if len(large[0])>=1:
+            tref[large] *= ssize / theta[large]
+            err_tref[large] *= ssize / theta[large]
         return tref, err_tref
 
     def get_rms_var(self, position, stype=AGN, ssize=0, nyears=1):
@@ -246,8 +251,9 @@ class SM(object):
         m, err_m = self.get_m(position, ssize=ssize)
 
         short = np.where(nyears * seconds_per_year < tref)
-        m[short] *= (nyears * seconds_per_year / tref[short])
-        err_m[short] *= (nyears * seconds_per_year / tref[short])
+        if(len(short[0])>=1):
+            m[short] *= (nyears * seconds_per_year / tref[short])
+            err_m[short] *= (nyears * seconds_per_year / tref[short])
         return m, err_m
 
     def get_vo(self, position):
@@ -270,7 +276,10 @@ class SM(object):
 
 def test_all_params():
     print("Testing with single positions")
-    sm = SM(os.path.join('data', 'Halpha_map.fits'), os.path.join('data', 'Halpha_error.fits'), nu=1e8)
+    #original map
+    #sm = SM(os.path.join('data', 'Halpha_map.fits'), os.path.join('data', 'Halpha_error.fits'), nu=1e8)
+    #new map
+    sm = SM(os.path.join('data', 'Ha_map_new.fits'), os.path.join('data', 'Ha_err_new.fits'), nu=1e8)
     pos = SkyCoord([0], [0], unit=(u.hour, u.degree))
     print("Hα = {0}".format(sm.get_halpha(pos)))
     print("ξ = {0}".format(sm.get_xi(pos)))
@@ -287,7 +296,10 @@ def test_all_params():
 
 def test_multi_pos():
     print("Testing with list of positions")
-    sm = SM(os.path.join('data', 'Halpha_map.fits'), os.path.join('data', 'Halpha_error.fits'))
+    # original map
+    # sm = SM(os.path.join('data', 'Halpha_map.fits'), os.path.join('data', 'Halpha_error.fits'), nu=1e8)
+    # new map
+    sm = SM(os.path.join('data', 'Ha_map_new.fits'), os.path.join('data', 'Ha_err_new.fits'), nu=1e8)
     pos = SkyCoord([0, 4, 8, 12, 16, 20]*u.hour, [-90, -45, 0, 45, 90, -26]*u.degree)
     print("Hα = {0}".format(sm.get_halpha(pos)))
     print("ξ = {0}".format(sm.get_xi(pos)))

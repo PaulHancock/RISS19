@@ -24,7 +24,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('-FUL', action='store', dest='FUL', default=1.,
                     help='Store upper flux limit (Jy)')
-parser.add_argument('-FLL', action='store', dest='FLL', default=0.001,
+parser.add_argument('-FLL', action='store', dest='FLL', default=0.01,
                     help='Store lower flux limit (Jy)')
 parser.add_argument('-mc', action='store', dest='mc', default=0.05,
                     help='Store modulation cut off value')
@@ -38,10 +38,13 @@ parser.add_argument('-i', action='store', dest='loops', default=20,
                     help='Number of iterations to run program through (30+ recommended)')
 parser.add_argument('-reg', action='store', dest='region_name',
                     help='read in region file')
+parser.add_argument('-map', action='store', dest='map', default=0,
+                    help='Select old (0) or new (1) Ha maps')
 parser.add_argument('--out', dest='outfile', default=False, type=str,
-                        help="Table of results")
+                        help="Output file name for results including file type (.csv)")
 parser.add_argument('--fig', dest='figure', default=False,
                         help="Save Figure?")
+
 parser.add_argument('--version', action='version', version='%(prog)s 1.0')
 
 results = parser.parse_args()
@@ -70,6 +73,12 @@ class SIM(object):
         self.loops=np.int(results.loops) #Default 20
         self.num_scale=40
         self.a=np.float(results.a) #Default 3300
+        if results.map==1:
+            self.ha_file = 'Ha_map_new.fits'
+            self.err_file = 'Ha_err_new.fits'
+        else:
+            self.ha_file = 'Halpha_map.fits'
+            self.err_file = 'Halpha_error.fits'
 
     def flux_gen(self):
         """
@@ -217,8 +226,8 @@ class SIM(object):
         # create the sky coordinate
         pos = SkyCoord(ra * u.degree, dec * u.degree, frame=frame)
         # make the SM object
-        sm = SM(ha_file=os.path.join(datadir, 'Halpha_map.fits'),
-                err_file=os.path.join(datadir, 'Halpha_error.fits'),
+        sm = SM(ha_file=os.path.join(datadir, self.ha_file),
+                err_file=os.path.join(datadir, self.err_file),
                 nu=nu, d=0)
         # Halpha
         val1, err1 = sm.get_halpha(pos)
@@ -246,7 +255,7 @@ class SIM(object):
         RA, DEC = self.region_gen(self.region_name)
         #print('RA')
         stype = self.stype_gen(RA)
-        ssize = self.ssize_gen(flux, stype)
+        ssize = self.ssize_gen(stype)
         #print('SS')
         mod, t0, Ha, theta= self.output_gen(RA, DEC, ssize)
         obs_yrs = self.obs_time / (3600. * 24. * 365.25)
