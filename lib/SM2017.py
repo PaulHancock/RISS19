@@ -7,23 +7,20 @@ NE2001 for extragalactic work.
 """
 
 
-from astropy.constants import kpc, c
+from astropy.constants import kpc, c, au
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.wcs import WCS
-from astropy.table import Table, Column
 import astropy.units as u
 import numpy as np
 import os
 import logging
 from scipy.special import gamma
 
-__author__ = 'Paul Hancock'
-__date__ = '2017-02-23'
-SFG=0
-AGN=1
+__author__ = ['Paul Hancock', 'Elliott Charlton']
+__date__ = '2019-06-07'
 
-seconds_per_year = 3600 * 24 * 365.25
+SECONDS_PER_YEAR = 3600 * 24 * 365.25
 
 class SM(object):
     """
@@ -34,7 +31,7 @@ class SM(object):
     :param v: in m/s
     :param log:
     """
-    def __init__(self, ha_file, err_file=None, nu=185e6, log=None, d=1, v=10e3):
+    def __init__(self, ha_file, err_file=None, nu=185e6, log=None, d=None, v=10e3):
 
         if log is None:
             logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
@@ -48,15 +45,13 @@ class SM(object):
         self.nu = nu  # Hz
         self.kpc = kpc.value  # in m
         self.t4 = 0.8  # t/1e4 K
-        self.lo = 1e18/(self.kpc*1e-3)  # pc
+        self.lo = 1e18/(self.kpc*1e-3)  # 1e18m expressed in pc (also armstrong_electron_1985 !)
         self.eps = 1
         self.D = d  # kpc - distance to the screen
         self.c = c.value
         self.beta = 11/3
         self.re = 2.817e-15  # m
-        self.rf = np.sqrt(self.c * self.D * self.kpc / (2*np.pi*self.nu))  # Fresnel scale
         self.v = v  # relative velocity of source/observer in m/s
-        #self.log.debug("data:{0} err:{1}".format(ha_file,err_file))
         self.file = ha_file
         self.err_file = err_file
         self._load_file()
@@ -66,7 +61,7 @@ class SM(object):
         self.wcs = WCS(self.hdu)
         self.data = fits.open(self.file, memmap=True, ignore_missing_end=True)[0].data
         if self.err_file:
-            self.err_hdu = fits.getheader(self.err_file,ignore_missing_end=True)
+            self.err_hdu = fits.getheader(self.err_file, ignore_missing_end=True)
             self.err_wcs = WCS(self.err_hdu)
             self.err_data = fits.open(self.err_file, memmap=True, ignore_missing_end=True)[0].data
         else:
@@ -74,25 +69,25 @@ class SM(object):
 
         return
 
-    def get_distance(self,position):
+    def get_distance(self, position):
         """
         :param position: sky position
         :return: Distance to scattering screen in kpc
         """
-        gal_r = 40.  # kpc
-        sun_r = 8.   # kpc
-        gal_h = 1.   # kpc
-        theta = position.galactic.l.radian  # angle from the GC along the plane
-        phi = position.galactic.b.radian  # angle from the GC perp to the plane
-        far_edge = sun_r*np.cos(theta) + np.sqrt(gal_r**2. - sun_r**2.*np.sin(theta)**2.)
-        top =  (gal_h/2. / np.abs(np.sin(phi)))
-        mask = np.where(top>far_edge)
+        if self.D is not None:
+            return np.ones(np.shape(position))*self.D
+        # TODO: sort out gal_r and find a reference for it
+        gal_r = 16.2  # kpc
+        sun_r = 8.09  # kpc
+        gal_h = 1   # kpc
+        theta = position.galactic.l.radian # angle from the GC along the plane
+        phi = position.galactic.b.radian   # angle from the GC perp to the plane
+        far_edge = sun_r*np.cos(theta) + np.sqrt(gal_r**2 - (sun_r*np.sin(theta))**2)
+        top = gal_h/2 / np.abs(np.sin(phi))
+        mask = np.where(top > far_edge)
         screen_dist = top
-        if len(mask[0])>=1:
-            screen_dist[mask] = far_edge[mask]
-        
-        return screen_dist/2.
-
+        screen_dist[mask] = far_edge[mask]
+        return screen_dist/2
 
     def get_rf(self, position):
         """
@@ -154,11 +149,8 @@ class SM(object):
         """
         # Narayan 1992 eq 4.2
         rdiff, err_rdiff = self.get_rdiff(position)
-        if self.rf == 0:
-            rf = self.get_rf(position)
-        else:
-            rf = self.rf
-        rref = rf ** 2 / rdiff
+        rf = self.get_rf(position)
+        rref = rf**2 / rdiff
         err_rref = (err_rdiff / rdiff) * rref
         return rref, err_rref
 
@@ -172,12 +164,9 @@ class SM(object):
         rdiff, err_rdiff = self.get_rdiff(position)
         # Narayan 1992, uses r_F/r_diff = \xi without explicitly stating that this is being done
         # Compare Narayan 1992 eq 3.5 with Walker 1998 eq 6
-        if self.rf == 0:
-            rf = self.get_rf(position)
-        else:
-            rf = self.rf
+        rf = self.get_rf(position)
         xi = rf / rdiff
-        err_xi = (err_rdiff / rdiff) * xi
+        err_xi = (err_rdiff/rdiff)*xi
         return xi, err_xi
 
     def get_theta(self, position):
@@ -188,7 +177,7 @@ class SM(object):
         """
         # See Narayan 1992 eq 4.10 and discussion immediately prior
         r_ref, err_r_ref = self.get_rref(position)
-        if self.D == 0:
+        if self.D is None:
             D = self.get_distance(position)
         else:
             D = self.D
@@ -200,29 +189,16 @@ class SM(object):
         """
         calculate the modulation index using parameter ξ for a given sky coord
         :param position: astropy.coordinates.SkyCoord
-        :param stype: Ignored
         :param ssize: source size in deg
         :return:
         """
         xi, err_xi = self.get_xi(position)
         m = xi ** (-1. / 3.)
         err_m = (1. / 3.) * (err_xi / xi) * m
-
         theta, err_theta = self.get_theta(position)
         large = np.where(ssize > theta)
-        if len([m]) > 1:
-            if len(large[0]) >= 1:
-                m[large] = m[large] * (theta[large] / ssize[large]) ** (7. / 6.)
-                err_m[large] = np.sqrt(err_m[large] ** (2.0) + ((7. / 6.) * (err_theta[large] / theta[large])) ** 2.) * m[
-                    large]
-        elif len([m])<=1:
-            m = m * (theta / ssize) ** (7. / 6.)
-            err_m = np.sqrt(err_m ** (2.0) + ((7. / 6.) * (err_theta / theta)) ** 2.) * m
-        """large = np.where(ssize > theta)
-        #if np.shape(large)[0] > 1:
-        m[large] = m[large] * (theta[large] / ssize[large]) ** (7. / 6.)
-        err_m[large] = np.sqrt(err_m[large] ** (2.) + ((7. / 6.) * (err_theta[large] / theta[large])) ** (2.)) * m[large]
-        """
+        m[mask] = m[mask] * (theta[mask] / ssize) ** (7. / 6.)
+        err_m[mask] = np.sqrt((err_m[mask]/m[mask]) ** (2.0) + ((7. / 6.) * (err_theta[mask] / theta[mask])) ** 2.) * m[mask]
         return m, err_m
 
     def get_timescale(self, position, ssize=0):
@@ -230,26 +206,19 @@ class SM(object):
         calculate the refractive timescale using parameter ξ for a given sky coord
         timescale is in years
         :param position: astropy.coordinates.SkyCoord
+        :param ssize: source size in deg
         :return:
         """
         xi, err_xi = self.get_xi(position)
-        if self.rf == 0:
-            rf = self.get_rf(position)
-        else:
-            rf = self.rf
-        tref = rf * xi / self.v / seconds_per_year
-        err_tref = (err_xi / xi) * tref
+        rf = self.get_rf(position)
+        tref = rf * xi / self.v / SECONDS_PER_YEAR
+        err_tref = (err_xi/xi)*tref
 
         # timescale is longer for 'large' sources
         theta, err_theta = self.get_theta(position)
         large = np.where(ssize > theta)
-        if len([tref])>1:
-            if len(large[0])>=1:
-                tref[large] *= ssize / theta[large]
-                err_tref[large] = np.sqrt((err_tref[large]/tref[large])**2.  + (err_theta[large]/theta[large])**2.)
-        elif len([tref])<=1:
-            tref = ssize / theta *tref
-            err_tref = np.sqrt((err_tref/tref)**2.0 + (err_theta / theta)**2.)*tref
+        tref[large] *= ssize / theta[large]
+        err_tref[large] = tref[large] * np.sqrt((err_tref[large]/tref[large])**2.  + (err_theta[large]/theta[large])**2.)
         return tref, err_tref
 
     def get_rms_var(self, position, ssize=0, nyears=1):
@@ -257,22 +226,17 @@ class SM(object):
         calculate the expected modulation index observed when measured on nyears timescales
         at a given sky coord
         :param position: astropy.coordinates.SkyCoord
+        :param ssize: source size in deg
         :param nyears: timescale of interest
         :param ssize: source size in deg
         :return:
         """
-
         tref, err_tref = self.get_timescale(position, ssize=ssize)
         m, err_m = self.get_m(position, ssize=ssize)
 
         short = np.where(nyears * seconds_per_year < tref)
-        if len([tref])>1:
-            if (len(short[0]) >= 1):
-                m[short] *= (nyears / tref[short])
-                err_m[short] = np.sqrt(err_m[short] ** 2. + (err_tref[short] / tref[short]) ** 2.) * m[short]
-        elif len([tref])<=1:
-            m *= (nyears / tref)
-            err_m = np.sqrt(err_m ** 2. + (err_tref / tref) ** 2.) * m
+        m[short] *= (nyears / tref[short])
+        err_m[short] = np.sqrt((err_m[short]/m[short]) ** 2. + (err_tref[short] / tref[short]) ** 2.) * m[short]
         return m, err_m
 
     def get_vo(self, position):
@@ -285,13 +249,10 @@ class SM(object):
         pow = (1 / (2 - self.beta))
         A = (2 ** (2 - self.beta) * (np.pi * self.re ** 2 * self.beta) * sm2 * self.kpc *
              gamma(-self.beta / 2) / gamma(self.beta / 2)) ** pow
-        if self.D == 0:
-            D = self.get_distance(position)
-        else:
-            D = self.D
-        vo = self.c * (np.sqrt(D * self.kpc / (2 * np.pi)) / A) ** (1 / (0.5 - 2 * pow))
+        D = self.get_distance(position)
+        vo = self.c * (np.sqrt(D*self.kpc/(2*np.pi)) / A)**(1/(0.5 - 2*pow))
+        return vo/1e9
 
-        return vo / 1e9
 
 def test_all_params():
     print("Testing with single positions")
@@ -329,11 +290,11 @@ def test_multi_pos():
     print("theta = {0}".format(sm.get_theta(pos)))
 
 def write_multi_pos():
+    from astropy.table import Table, Column
     RA=np.append(np.arange(0,360),np.arange(0,360))
     DEC=np.append(np.append(np.append(np.arange(-90,90),np.arange(-90,90)),np.arange(-90,90)),np.arange(-90,90))
     #Original map
     #sm = SM(os.path.join('data', 'Halpha_map.fits'), os.path.join('data', 'Halpha_error.fits'), nu=1e8)
-    # new map
     sm = SM(os.path.join('data', 'Ha_map_new.fits'), os.path.join('data', 'Ha_err_new.fits'), nu=1e8)
 
 
@@ -365,5 +326,5 @@ def write_multi_pos():
 
 if __name__ == "__main__":
     test_all_params()
-    #test_multi_pos()
-    #write_multi_pos()
+    test_multi_pos()
+    write_multi_pos()

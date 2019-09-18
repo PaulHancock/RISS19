@@ -12,6 +12,7 @@ import logging
 import os
 import sys
 import argparse
+import numpy as np
 
 # Turn off the stupid warnings that Astropy emits when loading just about any fits file.
 import warnings
@@ -22,31 +23,33 @@ logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
 log = logging.getLogger("varcalc")
 log.setLevel(logging.INFO)
 
-__author__ = 'Paul Hancock'
-__date__ = '2017-03-02'
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     group1 = parser.add_argument_group('Output parameter selection')
-    group1.add_argument('-H', '--Halpha', dest='halpha', action='store_true', default=False,
+    group1.add_argument('--Halpha', dest='halpha', action='store_true', default=False,
                         help='Calculate Hα intensity (Rayleighs)')
-    group1.add_argument('-x', '--xi', dest='xi', action='store_true', default=False,
+    group1.add_argument('--xi', dest='xi', action='store_true', default=False,
                         help='Calculate ξ (dimensionless)')
-    group1.add_argument('-m', '--modulation', dest='m', action='store_true', default=False,
+    group1.add_argument('--mod', dest='m', action='store_true', default=False,
                         help='Calculate modulation index (fraction)')
-    group1.add_argument('-s', '--sm', dest='sm', action='store_true', default=False,
+    group1.add_argument('--sm', dest='sm', action='store_true', default=False,
                         help='Calculate scintillation measure (kpc m^{-20/3})')
-    group1.add_argument('-t', '--timescale', dest='t0', action='store_true', default=False,
+    group1.add_argument('--timescale', dest='t0', action='store_true', default=False,
                         help='Calculate timescale of variability (years)')
-    group1.add_argument('-r', '--rms', dest='rms', action='store_true', default=False,
+    group1.add_argument('--rms1y', dest='rms', action='store_true', default=False,
                         help='Calculate rms variability over 1 year (fraction/year)')
-    group1.add_argument('-d', '--theta', dest='theta', action='store_true', default=False,
+    group1.add_argument('--theta', dest='theta', action='store_true', default=False,
                         help='Calculate the scattering disk size (deg)')
-    group1.add_argument('-v', '--nuzero', dest='nuzero', action='store_true', default=False,
+    group1.add_argument('--nuzero', dest='nuzero', action='store_true', default=False,
                         help='Calculate the transition frequency (GHz)')
+    group1.add_argument('--fzero', dest='fzero', action='store_true', default=False,
+                        help='Calculate the Fresnel zone (deg)')
+    group1.add_argument('--dist', dest='dist', action='store_true', default=False,
+                        help='Calculate the model distance')
     group1.add_argument('--all', dest='do_all', action='store_true', default=False,
-                        help='Include all parameters')
+                        help='Include all of the above parameter calculations')
 
     group2 = parser.add_argument_group('Input and output data')
     group2.add_argument('--in', dest='infile', default=None, type=argparse.FileType('r'),
@@ -67,7 +70,7 @@ if __name__ == "__main__":
     group3 = parser.add_argument_group('Input parameter settings')
     group3.add_argument('--freq', dest='frequency', default=185, type=float,
                         help="Frequency in MHz")
-    group3.add_argument('--dist', dest='distance', default=1, type=float,
+    group3.add_argument('--dist_in', dest='dist_in', type=float, default=None,
                         help="Distance to scattering screen in kpc")
     group3.add_argument('--vel', dest='velocity', default=10, type=float,
                         help="Relative motion of screen and observer in km/s")
@@ -79,15 +82,20 @@ if __name__ == "__main__":
 
     if results.do_all:
         results.halpha = results.sm = results.m = results.rms = True
-        results.xi = results.t0 = results.theta = results.nuzero = True
+        results.xi = results.t0 = results.theta = results.nuzero = results.fzero = True
+        results.dist = True
 
     # data is stored in the data dir, relative to *this* file
     datadir = os.path.join(os.path.dirname(__file__), 'data')
 
-    nu = results.frequency*1e6
-    d = results.distance
-    v = results.velocity * 1e3
+    nu = results.frequency*1e6 # GHz
+    v = results.velocity * 1e3 # km/s
+    d = results.dist_in # kpc
     # For doing a one off position calculation
+
+    if results.pos is None and results.infile is None:
+        parser.print_usage()
+        sys.exit(0)
 
     if results.galactic:
         log.info("Using galactic coordinates")
@@ -138,6 +146,9 @@ if __name__ == "__main__":
         if results.nuzero:
             val = sm.get_vo(pos)
             print("nu0: ", val, "GHz")
+        if results.dist:
+            val = sm.get_distance(pos)
+            print("distance: ", val, "kpc")
         sys.exit(0)
 
     if results.infile:
@@ -165,9 +176,12 @@ if __name__ == "__main__":
         else:
             print("Appending results to existing table")
         if results.halpha:
-            val,err=sm.get_halpha(pos)
+            val, err=sm.get_halpha(pos)
             tab.add_column(Column(data=val, name='Halpha'))
             tab.add_column(Column(data=err, name='err_Halpha'))
+        if results.dist:
+            val = sm.get_distance(pos)
+            tab.add_column(Column(data=val, name='Distance'))
         if results.xi:
             val, err = sm.get_xi(pos)
             tab.add_column(Column(data=val, name='xi'))
@@ -197,8 +211,3 @@ if __name__ == "__main__":
             tab.add_column(Column(data=val, name='nu0'))
         print("Writing to {0}".format(results.outfile))
         tab.write(results.outfile, overwrite=True)
-
-
-
-
-
