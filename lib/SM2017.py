@@ -82,8 +82,8 @@ class SM(object):
         gal_h = 1   # kpc
         theta = position.galactic.l.radian # angle from the GC along the plane
         phi = position.galactic.b.radian   # angle from the GC perp to the plane
-        far_edge = sun_r*np.cos(theta) + np.sqrt(gal_r**2 - sun_r**2*np.sin(theta**2))
-        top = 1 / (gal_h/2 * np.abs(np.sin(phi)))
+        far_edge = sun_r*np.cos(theta) + np.sqrt(gal_r**2 - (sun_r*np.sin(theta))**2)
+        top = gal_h/2 / np.abs(np.sin(phi))
         mask = np.where(top > far_edge)
         screen_dist = top
         screen_dist[mask] = far_edge[mask]
