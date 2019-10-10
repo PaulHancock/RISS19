@@ -7,7 +7,7 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.table import Table, Column
 import astropy.units as u
-from lib.tau import SM
+from lib.new_SM17 import SM
 from astropy.utils.exceptions import AstropyWarning
 import warnings
 warnings.filterwarnings("ignore")
@@ -25,7 +25,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument('-FUL', action='store', dest='FUL', default=1.,
                     help='Store upper flux limit (Jy)')
-parser.add_argument('-FLL', action='store', dest='FLL', default=0.01,
+parser.add_argument('-FLL', action='store', dest='FLL', default=50e-3,
                     help='Store lower flux limit (Jy)')
 parser.add_argument('-mc', action='store', dest='mc', default=0.05,
                     help='Store modulation cut off value')
@@ -33,8 +33,7 @@ parser.add_argument('-t', action='store', dest='obs_time', default=365.,
                     help='observation time in days')
 parser.add_argument('-a', action='store', dest='a', default=3300.,
                     help='Scaling Constant for source counts')
-parser.add_argument('-scount', action='store', dest='scount', default=False,
-                    help='Number of sources')
+#parser.add_argument('-scount', action='store', dest='scount', default=False, help='Number of sources')
 parser.add_argument('-f', action='store', dest='nu', default=185.,
                     help='Frequency in MHz')
 parser.add_argument('-i', action='store', dest='loops', default=20,
@@ -67,7 +66,7 @@ class SIM(object):
         self.nu = np.float(results.nu) * 1e6 #Hz, Default 185 MHz
         self.arcsec = np.pi / (180. * 3600.)
         self.mod_cutoff = np.float(results.mc) #Default 0.05
-        self.low_Flim = np.float(results.FLL)  # Jy, Default 0.01 Jy
+        self.low_Flim = np.float(results.FLL)  # Jy, Default 50e-3 Jy
         self.upp_Flim = np.float(results.FUL) # Jy, Default 1 Jy
         self.region_name = results.region_name
         region=cPickle.load(open(self.region_name, 'rb'))
@@ -84,73 +83,104 @@ class SIM(object):
             self.ha_file = 'Halpha_map.fits'
             self.err_file = 'Halpha_error.fits'
 
-        self.scount=float(results.scount)
+        #self.scount=float(results.scount)
 
-    def flux_gen(self):
+    def flux_gen(self, alpha=0.8):
         """
         Function to distribute flux across all points
         Input:  Flux Density limit, RA/DEC positions, source distribution function
         Output: Flux for each RA/DEC point
         """
-        low=self.low_Flim
-        upp=self.upp_Flim
-        #Function that finds dN = (alpha * [Flux] ** (1-b))/ 1-b
-        def dn_func(val, a, b):
-            output = (a * val ** (1.0 - b)) / (1.0 - b)
-            return output
-        #Takes input of lower flux, upper flux, a and b values to create differentail flux counts in that range.
-        #Main outputs: Bins, Ni.
-        def diff_counts(a, b, low, upp):
-            low=np.log10(low)
-            upp=np.log10(upp)
-            bins = np.logspace(low, upp, num=100)
-            Ni = []
-            mpoint = []
-            dS = []
-            for i in range(0, len(bins) - 1):
-                Ni.append(dn_func(bins[i + 1], a, b) - dn_func(bins[i], a, b))
-                mpoint.append(np.sqrt(bins[i + 1] * bins[i]))
-                dS.append(bins[i + 1] - bins[i])
-            Ni = np.array(Ni)
-            mpoint = np.array(mpoint)
-            dS = np.array(dS)
-            dNdS= Ni / dS
-            return bins, dNdS, mpoint, Ni, dS
-        a = self.a
-        bins, dnds, mid, Ni, width = diff_counts(a, 1.6, low, upp)
+
+        def franz_counts(mids):
+            a = [3.52, 0.307, -0.388, -0.0404, 0.0351, 0.006]
+            source_counts = []
+            for ii in range(0, len(mids)):
+                x = (mids[ii])
+                sum_counts = 0.
+                for i in range(0, 6):
+                    sum_counts = sum_counts + (a[i] * (np.log10(x)) ** i)
+                sum_counts = 10 ** (sum_counts)
+                source_counts.append(sum_counts)
+            return (source_counts)
+
+        def hopkins_counts(mids):
+            a = [0.859, 0.508, 0.376, -0.049, -0.121, 0.057, -0.008]
+            source_counts = []
+            mids = mids * 1e3
+            for ii in range(0, len(mids)):
+                x = (mids[ii])
+                sum_counts = 0.
+                for i in range(0, 7):
+                    sum_counts = sum_counts + (a[i] * (np.log10(x)) ** i)
+                sum_counts = 10 ** (sum_counts)
+                source_counts.append(sum_counts)
+            return (source_counts)
+
+        def scale(f, f0, low=50e-3, upp=1., alpha=0.8):
+            freq_ratio = (np.float(f) / f0) ** alpha
+            low_flux = np.log10(low * freq_ratio)
+            upp_flux = np.log10(upp * freq_ratio)
+            edges = np.logspace(low_flux, upp_flux, num=30)
+            mids = []
+            ds = []
+            for i in range(0, len(edges) - 1):
+                mids.append(np.sqrt(edges[i + 1] * edges[i]))
+                ds.append(edges[i + 1] - edges[i])
+            mids = np.array(mids)
+            ds = np.array(ds)
+            return mids, ds, edges, low_flux, upp_flux
+
+        def scount(low, upp, alpha=0.8, freq=185e6):
+            f0_f = 154e6
+            f0_h = 1400e6
+
+            franz_stats = scale(freq, f0_f, low, upp, alpha)
+            mid_f, ds_f, edg_f = franz_stats[0], franz_stats[1], franz_stats[2]
+            hopkins_stats = scale(freq, f0_h, low, upp, alpha)
+            mid_h, ds_h, edg_h = hopkins_stats[0], hopkins_stats[1], hopkins_stats[2]
+
+            counts_f = franz_counts(mid_f)
+            counts_h = hopkins_counts(mid_h)
+
+            normcounts_f = counts_f * ds_f * mid_f ** (-2.5)
+            normcounts_h = counts_h * ds_h * mid_h ** (-2.5)
+
+            sum_f = np.sum(normcounts_f)
+            sum_h = np.sum(normcounts_h)
+
+            if freq <= f0_f:
+                sumcounts = sum_f
+                mid = mid_f
+                normcounts = normcounts_f
+                edges = edg_f
+            elif freq >= f0_h:
+                sumcounts = sum_h
+                mid = mid_h
+                normcounts = normcounts_h
+                edges=edg_h
+
+            else:
+                # print 'ratio', f0_f/(f0_f+freq), (f0_t-freq)/(f0_t+f0_f)
+
+                dF = np.abs(freq - f0_f)
+                dH = np.abs(freq - f0_h)
+                fw1 = 1 - np.abs(dF) / (dF + dH)
+                fw2 = 1 - np.abs(dH) / (dF + dH)
+                # print 'ratio_else', fw1,fw2, fw1+fw2
+                normcounts = normcounts_f * fw1 + normcounts_h * fw2
+                sumcounts = sum_f * fw1 + sum_h * fw2
+                mid = mid_f * fw1 + mid_h * fw2
+                edges = edg_f * fw1 + edg_h * fw2
+
+            # print sumcounts*(np.pi/180.)**2.
+            return normcounts, sumcounts, mid, edges
+        norm_counts,  total_counts, mids, edges= scount(self.low_Flim, self.upp_Flim, 0.8, self.nu)
         Area = self.area * (np.pi ** 2.) / (180. ** 2.)
-        #print('bins',sum(bins))
-        #print(sum(Ni))
-        scount=self.scount
-        #print(scount)
-        plim=0.01
-        num_s = 0
-        for i in range(0, len(bins) - 1):
-            num_s = num_s + int(Ni[i] * Area)
-        if scount!=False:
-            while ((num_s  >= scount + plim * scount) or (num_s  <= scount - plim * scount)):
-                num_s = 0
-                for i in range(0, len(bins) - 1):
-                    num_s = num_s + int(Ni[i] * Area)
-                    #print('num_s', num_s)
-                if num_s >= scount + plim * scount:
-                    a = a-plim*a
-                    bins, dnds, mid, Ni, width = diff_counts(a, 1.6, low, upp)
-                if num_s  <= scount - plim * scount:
-                    a = a + 0.01 * a
-                    bins, dnds, mid, Ni, width = diff_counts(a, 1.6, low, upp)
-                #print('a', a)
-            #if (Ni>scount+0.05*scount or Ni<scount-0.05*scount):
         FLUX = []
-        self.a=a
-
-        for i in range(0, len(bins) - 1):
-            rang = np.logspace(np.log10(bins[i]), np.log10(bins[i]+width[i]), dtype=float)
-            FLUX.extend(np.random.choice(rang, size=int(Ni[i]*Area)))
+        for i in range(0, len(edges) - 1):
+            FLUX.extend(np.random.uniform(edges[i], edges[i + 1], size=int(norm_counts[i]*Area)))
         flux_arr = np.random.permutation(np.array(FLUX))
-        #print(len(flux_arr))
-        #print(np.sum(Ni)*Area)
-
         return flux_arr, len(flux_arr)
 
     def pos_gen(self):
@@ -202,17 +232,14 @@ class SIM(object):
         reg_dec = []
         region = cPickle.load(open(reg_file, 'rb'))
         num=self.flux_gen()[1]
-        #print(num)
         while len(reg_ind) < num:
             RA, DEC = self.pos_gen()
-            #print(len(RA))
             reg_arr = region.sky_within(RA, DEC, degin=True)
             for i in range(0, len(reg_arr)):
                 if len(reg_ra) < num:
                     reg_ind.append(i)
                     reg_ra.append(RA[i])
                     reg_dec.append(DEC[i])
-                    #print(len(reg_ind), len(reg_dec))
         return np.array(reg_ra), np.array(reg_dec)
 
     def stype_gen(self,arr):
@@ -270,7 +297,8 @@ class SIM(object):
         Output: Modulation, Timescale, Halpha, Theta
         """
         nu = np.float(self.nu)
-        frame = 'fk5'
+        frame = 'galactic'
+        #frame='fk5'
         tab = Table()
 
         # create the sky coordinate
@@ -279,24 +307,28 @@ class SIM(object):
 
         sm = SM(ha_file=os.path.join(datadir, self.ha_file),
                 err_file=os.path.join(datadir, self.err_file),
-                nu=nu, d=0)
+                nu=nu)
         # Halpha
         Ha, err_Ha = sm.get_halpha(pos)
         # xi
         #xi, err_xi = sm.get_xi(pos)
         # theta
+
         theta, err_theta = sm.get_theta(pos)
-        # sm
+        #sm
         #sm, err_sm = sm.get_sm(pos)
         # mod
+
         m, err_m = sm.get_m(pos, ssize)
         # t0
-        t0, err_t0 = sm.get_timescale(pos)
+        t0, err_t0 = sm.get_timescale(pos,ssize)
         # rms
         #val6, err6 = sm.get_rms_var(pos, stype, ssize)
 
         #tau
-        tau, err_tau=sm.get_tau(pos)
+        #tau, err_tau=sm.get_tau(pos)
+        tau=1
+        err_tau=1
         return m, err_m, t0, err_t0, Ha, err_Ha , theta, err_theta, tau, err_tau
 
     def areal_gen(self):
@@ -320,19 +352,26 @@ class SIM(object):
         mp = np.random.normal(loc=mod, scale=err_m)
         vcount=0
         mcount=0
+        varcount=0
         v_arr=np.zeros(len(flux))
         m_arr=np.zeros(len(flux))
+        var_arr = np.zeros(len(flux))
         for i in range(0,len(mp)):
-            if mp[i]*flux[i]>=self.low_Flim/5.:
+            if mp[i]*flux[i]>=self.low_Flim*3.:
                 vcount=vcount+1
                 v_arr[i]=1
             if mp[i]>=self.mod_cutoff:
                 mcount=mcount+1
                 m_arr[i]=1
+            if (m_arr[i]==1 and v_arr[i]==1):
+                varcount=varcount+1
+                var_arr[i]=1
         #print(vcount,mcount)
         #print(np.nanmean(theta*3600))
         mareal = float(mcount) / self.area
         vareal = float(vcount) / self.area
+        varareal=float(varcount)/ self.area
+        print(mcount, vcount, varcount)
         """
         mcert = 0
         muncert=0
@@ -365,11 +404,12 @@ class SIM(object):
         """
         datatab1 = Table()
         mvar=int(self.map)
-        datafile = self.region_name[8:-4] + '_tau' +'_m{0}_data.csv'.format(mvar)
+        datafile = self.region_name[8:-4] + '_test_19' +'_m{0}_data.csv'.format(mvar)
         #print('mod_mean',np.mean(mod))
         ### DATA FILE
         datatab1.add_column(Column(data=RA, name='RA'))
         datatab1.add_column(Column(data=DEC, name='DEC'))
+        datatab1.add_column(Column(data=flux, name='flux'))
         datatab1.add_column(Column(data=Ha, name='H_Alpha'))
         datatab1.add_column(Column(data=err_Ha, name='H_Alpha err'))
         datatab1.add_column(Column(data=mod, name='Modulation'))
@@ -378,10 +418,10 @@ class SIM(object):
         datatab1.add_column(Column(data=err_t0, name='Timescale err'))
         datatab1.add_column(Column(data=theta, name='Theta'))
         datatab1.add_column(Column(data=err_theta, name='Theta err'))
-        datatab1.add_column(Column(data=tau, name='Tau'))
-        datatab1.add_column(Column(data=err_tau, name='Tau err'))
+        #datatab1.add_column(Column(data=tau, name='Tau'))
+        #datatab1.add_column(Column(data=err_tau, name='Tau err'))
         datatab1.write(datafile, overwrite=True)
-        return mareal, mp, t0, Ha, theta, flux, vareal
+        return mareal, mp, t0, Ha, theta, flux, mareal, vareal, varareal
 
     def repeat(self):
         """
@@ -409,7 +449,7 @@ class SIM(object):
         areal_arr = np.array(areal_arr)
         NSources = np.array(NSources)
 
-        return areal_arr, mod_arr,t0_arr, Ha_arr, theta_arr, count, NSources, self.area, self.low_Flim, self.upp_Flim, self.obs_time, self.nu, self.mod_cutoff, self.a
+        return areal_arr, mod_arr,t0_arr, Ha_arr, theta_arr, count, NSources, self.area, self.low_Flim, self.upp_Flim, self.obs_time, self.nu, self.mod_cutoff
 
 
 def test():
@@ -420,7 +460,7 @@ def test():
     """
 
     sim=SIM()
-    areal_arr, mod_arr, t0_arr, Ha_arr, theta_arr, count, NSources, area, low_Flim, upp_Flim, obs_time, nu, mod_cutoff, a=sim.repeat()
+    areal_arr, mod_arr, t0_arr, Ha_arr, theta_arr, count, NSources, area, low_Flim, upp_Flim, obs_time, nu, mod_cutoff=sim.repeat()
     datatab=Table()
     resultstab=Table()
     if outfile != False:
@@ -462,7 +502,6 @@ def test():
         print("Num Sources: {0}".format(np.mean(NSources)))
         print("Area: {0}".format(area))
         print("Num Variable: {0}".format(np.mean(areal_arr)*area))
-        print("a: {0}".format(a))
-
+        print("% Variable: {0}".format(np.mean(areal_arr) * area*100./np.mean(NSources)))
 
 test()
