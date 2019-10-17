@@ -229,25 +229,12 @@ class SIM(object):
         FLUX = []
         num_sources = norm_counts * Area
         total_counts = total_counts * Area
-        i, n = 0, 0
-        while i <= len(edges) - 1:
-            if n < 1:
-                count = np.sum(num_sources[i - n :i + n+  1])
-            if n >= 1:
-                count = np.sum(num_sources[i - n:i + n])
-                if count <= 1 and count >= 0.75:
-                    count = 1
-            if int(count) >= 1:
-                if n < 1:
-                    FLUX.extend(np.random.uniform(edges[i - n], edges[i + 1], size=int(count)))
-                    n = 0
-                if n >= 1 and n+i<len(edges)-1:
-                    FLUX.extend(np.random.uniform(edges[i - n], edges[i + n], size=int(count)))
-                    n = 0
-            elif int(count) < 1:
-                n = n + 1
-            i = i + 1
-
+        for i in range(0, len(edges) - 1):
+            count = num_sources[i]
+            p = count - int(count)
+            leftover_count = np.random.choice([0, 1], p=[1 - p, p])
+            count = int(count) + leftover_count
+            FLUX.extend(np.random.uniform(edges[i], edges[i + 1], size=int(count)))
         flux_arr = np.random.permutation(np.array(FLUX))
         return flux_arr, len(flux_arr)
 
@@ -413,27 +400,22 @@ class SIM(object):
         #print('SS')
         mod, err_m, t0, err_t0, Ha, err_Ha, theta, err_theta, tau, err_tau= self.output_gen(RA, DEC, ssize)
         obs_yrs = self.obs_time / (3600. * 24. * 365.25)
-        for i in range(0, len(t0) - 1):
-            if obs_yrs <= t0[i]:
-                mod[i] = mod[i] * (np.float(obs_yrs / t0[i]))
-                err_m[i] = err_m[i] * (np.float(obs_yrs / t0[i]))
+
+        t_mask=np.where(obs_yrs<=t0)
+        mod[t_mask] = mod[t_mask]  (np.float(obs_yrs / t0[t_mask]))
+        err_m[t_mask] = err_m[t_mask] * (np.float(obs_yrs / t0[t_mask]))
+
         mp = np.random.normal(loc=mod, scale=err_m)
-        vcount=0
-        mcount=0
-        varcount=0
-        v_arr=np.zeros(len(flux))
-        m_arr=np.zeros(len(flux))
-        var_arr = np.zeros(len(flux))
-        for i in range(0,len(mp)):
-            if mp[i]*flux[i]>=self.low_Flim*3.:
-                vcount=vcount+1
-                v_arr[i]=1
-            if mp[i]>=self.mod_cutoff:
-                mcount=mcount+1
-                m_arr[i]=1
-            if (m_arr[i]==1 and v_arr[i]==1):
-                varcount=varcount+1
-                var_arr[i]=1
+
+        v_mask=np.where(mp*flux>=self.low_Flim*3.)
+        m_mask=np.where(mp>=self.mod_cutoff)
+        var_mask=np.where((mp*flux>=self.low_Flim*3.) & (mp>=self.mod_cutoff))
+        v_arr[v_mask] = 1
+        m_arr[m_mask] = 1
+        var_arr[var_mask] = 1
+        vcount = np.sum(v_arr)
+        mcount = np.sum(m_arr)
+        varcount = np.sum(var_arr)
         #print(vcount,mcount)
         #print(np.nanmean(theta*3600))
         mareal = float(mcount) / self.area
