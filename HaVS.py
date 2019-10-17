@@ -244,8 +244,10 @@ class SIM(object):
         Input:  Number of points to generate from flux_gen function
         Output: List of RA/DEC (2,1) array in (2D) Cartesian coordiantes.
         """
-        num=self.flux_gen()[1]
-        num=num*self.num_scale
+
+        num_sources=self.flux_gen()[1]
+
+        num=num_sources*100.
         lim = int(num * 2.5)
         x = []
         y = []
@@ -269,10 +271,10 @@ class SIM(object):
         #converting back to cartesian cooridantes
         theta = np.arccos(z / r0) * 180 / np.pi
         theta = theta - 90.
-        theta = theta[:num]
+        theta = theta[:num_sources]
         phi = np.arctan2(y, x) * 180. / (np.pi)
         phi = phi + 180.
-        phi = phi[:num]
+        phi = phi[:num_sources]
         return phi, theta
 
     def region_gen(self, reg_file):
@@ -286,7 +288,7 @@ class SIM(object):
         reg_ra = []
         reg_dec = []
         region = cPickle.load(open(reg_file, 'rb'))
-        num=self.flux_gen()[1]
+        flux, num=self.flux_gen()
         while len(reg_ind) < num:
             RA, DEC = self.pos_gen()
             reg_arr = region.sky_within(RA, DEC, degin=True)
@@ -295,7 +297,7 @@ class SIM(object):
                     reg_ind.append(i)
                     reg_ra.append(RA[i])
                     reg_dec.append(DEC[i])
-        return np.array(reg_ra), np.array(reg_dec)
+        return np.array(reg_ra[:num]), np.array(reg_dec[:num]), flux, num
 
     def stype_gen(self,arr):
         """
@@ -314,32 +316,15 @@ class SIM(object):
         Input: Flux and source type
         Output: Source size
         """
-        """
-        tt = theta
-        tm = np.nanmean(tt)
-        #tmed = np.nanmedian(tt)
-        cn = tt[np.where(tt <= tm)]
-        en = tt[np.where(tt > tm)]
 
-        # en=np.ran
-        # print cn
-        ssize = []
-        # 0 = extended
-        # 1 = compact
-        for i in range(0, len(tt)):
-            if stype[i] == 0:
-                ssize.append(np.random.choice(en))
-            if stype[i] == 1:
-                ssize.append(np.random.choice(cn))
-        """
         ssize_arr=[]
         for i in range(0, len(stype)):
 
             if stype[i] == AGN:
-                # 2 milli arc secs
+                #  milli arc secs
                 ssize_arr.append((0.5*1e-3)/3600.) #(0.0979/(3600.)) actual values
             elif stype[i] == SFG:
-                # 30 milli arc secs
+                #  milli arc secs
                 ssize_arr.append((10*1e-3)/3600.) #(0.2063/(3600.)) actual values
 
         return np.array(ssize_arr)
@@ -392,66 +377,34 @@ class SIM(object):
         Uses: Flux, Region, Stype, Ssize, Output (Ha, mod, t0, theta), Obs_Yrs
         Output: ASD, modulation, timescale, Ha, Theta
         """
-        flux, num = self.flux_gen()
-        RA, DEC = self.region_gen(self.region_name)
+        RA, DEC, flux, num = self.region_gen(self.region_name)
+
         #print('RA')
         stype = self.stype_gen(RA)
         ssize = self.ssize_gen(stype)
         #print('SS')
         mod, err_m, t0, err_t0, Ha, err_Ha, theta, err_theta, tau, err_tau= self.output_gen(RA, DEC, ssize)
         obs_yrs = self.obs_time / (3600. * 24. * 365.25)
-
-        t_mask=np.where(obs_yrs<=t0)
-        mod[t_mask] = mod[t_mask]  (np.float(obs_yrs / t0[t_mask]))
-        err_m[t_mask] = err_m[t_mask] * (np.float(obs_yrs / t0[t_mask]))
+        t_mask=np.where(np.float(obs_yrs)<=t0)
+        mod[t_mask] = mod[t_mask] * (np.float(obs_yrs)/ t0[t_mask])
+        err_m[t_mask] = err_m[t_mask] * (np.float(obs_yrs) / t0[t_mask])
 
         mp = np.random.normal(loc=mod, scale=err_m)
 
         v_mask=np.where(mp*flux>=self.low_Flim*3.)
         m_mask=np.where(mp>=self.mod_cutoff)
         var_mask=np.where((mp*flux>=self.low_Flim*3.) & (mp>=self.mod_cutoff))
-        v_arr[v_mask] = 1
-        m_arr[m_mask] = 1
-        var_arr[var_mask] = 1
-        vcount = np.sum(v_arr)
-        mcount = np.sum(m_arr)
-        varcount = np.sum(var_arr)
+
+        vcount = len(v_mask[0])
+        mcount = len(m_mask[0])
+        varcount = len(var_mask[0])
         #print(vcount,mcount)
         #print(np.nanmean(theta*3600))
         mareal = float(mcount) / self.area
         vareal = float(vcount) / self.area
         varareal=float(varcount)/ self.area
         print(mcount, vcount, varcount)
-        """
-        mcert = 0
-        muncert=0
-        nonvar=0
-        var = [] #Definitely Var
-        mvar = [] #Maybe Var
-        nvar = [] #Non Var
-        mnvar = []  # Maybe Non Var
-        #print(mod[np.where(mod=='nan')])
-        for i in range(0, len(t0) - 1):
-            if obs_yrs <= t0[i]:
-                mod[i] = mod[i] * (np.float(obs_yrs/t0[i]))
-                err_m[i]= err_m[i] * (np.float(obs_yrs/t0[i]))
-        for i in range(0, len(mod)):
-            if mod[i] >= self.mod_cutoff and mod[i] - err_m[i]>= self.mod_cutoff:
-                #mcert = mcert + 1
-                var.append(mod[i])
-            elif mod[i] >= self.mod_cutoff and mod[i] - err_m[i] <= self.mod_cutoff:
-                #muncert = muncert + 1
-                mvar.append(mod[i])
-            elif mod[i] <= self.mod_cutoff and mod[i] + err_m[i] >= self.mod_cutoff:
-                #var = nvar + 1
-                mnvar.append(mod[i])
-            elif mod[i] <= self.mod_cutoff and mod[i] + err_m[i] <= self.mod_cutoff:
-                #mnvar=nonvar+1
-                nvar.append(mod[i])
-        areal = float(len(var)+len(mvar)) / self.area
-        print(len(var), len(mvar), len(mnvar), len(nvar), (len(var)+len(mvar)+len(mnvar)+len(nvar)),len(mod))
-        #print(np.nanmean(err_m)*100./np.nanmean(mod))
-        """
+
         datatab1 = Table()
         mvar=int(self.map)
         datafile = self.region_name[8:-4] + '_test_19' +'_m{0}_data.csv'.format(mvar)
