@@ -423,7 +423,7 @@ class SIM(object):
         #datatab1.add_column(Column(data=tau, name='Tau'))
         #datatab1.add_column(Column(data=err_tau, name='Tau err'))
         datatab1.write(datafile, overwrite=True)
-        return mareal, mp, t0, Ha, theta, flux, mareal, vareal, varareal
+        return varareal, mp, t0, Ha, theta, flux, mareal, vareal, varareal
 
     def repeat(self):
         """
