@@ -4,6 +4,7 @@ import logging
 import cPickle
 import argparse
 import numpy as np
+import numpy.polynomial.polynomial as poly
 from astropy.coordinates import SkyCoord
 from astropy.table import Table, Column
 import astropy.units as u
@@ -76,6 +77,7 @@ class SIM(object):
         self.num_scale=40
         self.a=np.float(results.a) #Default 3300
         self.map=float(results.map)
+        self.alpha=-0.8
         if self.map==1:
             self.ha_file = 'Ha_map_new.fits'
             self.err_file = 'Ha_err_new.fits'
@@ -117,11 +119,8 @@ class SIM(object):
                 source_counts.append(sum_counts)
             return (source_counts)
 
-        def linscale(f, f0, low=50e-3, upp=1., alpha=-0.8, inc=1e-3):
-            freq_ratio = (np.float(f) / f0) ** (alpha)
-            low_flux = np.float(low)
-            upp_flux = np.float(upp)
-            edges = np.arange(low_flux, upp_flux, inc)
+        def linscale(freq, f0, low=50e-3, upp=1., alpha=-0.8, inc=1e-4):
+            edges = np.arange(low, upp, inc)
             mids = []
             ds = []
             for i in range(0, len(edges) - 1):
@@ -129,106 +128,106 @@ class SIM(object):
                 ds.append(edges[i + 1] - edges[i])
             mids = np.array(mids)
             ds = np.array(ds)
-            return mids, ds, edges, mids * freq_ratio, ds * freq_ratio, edges * freq_ratio, freq_ratio
+            return mids, ds, edges
 
-        def scount(low, upp, alpha=0.8, freq=185e6, inc=1e-3):
+        def fran_gen(freq=185e6, alpha=-0.8, inc=1e-4):
+            f0 = 154e6
+            low = 1e-3
+            upp = 75.
+            fr = ((freq * 1.0) / f0) ** (alpha)
+            stats = linscale(freq, f0, low, upp, alpha, inc / fr)
+            mid, ds, edg = stats
+            counts = franz_counts(mid)
+            numcounts = counts * ds * mid ** (-2.5)
+            return mid * fr, numcounts, np.sum(numcounts), fr
+
+        def hop_gen(freq=185e6, alpha=-0.8, inc=1e-4):
+            f0 = 1400e6
+            low = 0.05e-3
+            upp = 1.
+            fr = ((freq * 1.0) / f0) ** (alpha)
+            stats = linscale(freq, f0, low, upp, alpha, inc / fr)
+            mid, ds, edg = stats
+            counts = hopkins_counts(mid)
+            numcounts = counts * ds * mid ** (-2.5)
+            return mid * fr, numcounts, np.sum(numcounts), fr
+
+        def weight(freq=185e6, alpha=-0.8, inc=1e-4):
+            fmid, fcounts, ftotal, fratio = fran_gen(freq, alpha=alpha, inc=inc)
+            hmid, hcounts, htotal, hratio = hop_gen(freq, alpha=alpha, inc=inc)
             f0_f = 154e6
             f0_h = 1400e6
-            low_f = 1e-3
-            low_h = 0.05e-3
-            upp_f = 75.
-            upp_h = 1.
-
-            franz_stats = linscale(freq, f0_f, low_f, upp_f, alpha, inc)
-            mid_f, ds_f, edg_f, mids_f, fr_f = franz_stats[0], franz_stats[1], franz_stats[2], franz_stats[3], \
-                                               franz_stats[6]
-            hopkins_stats = linscale(freq, f0_h, low_h, upp_h, alpha, inc)
-            mid_h, ds_h, edg_h, mids_h, fr_h = hopkins_stats[0], hopkins_stats[1], hopkins_stats[2], hopkins_stats[3], \
-                                               hopkins_stats[6]
-            counts_f = franz_counts(mid_f)
-            counts_h = hopkins_counts(mid_h)
-
-            normcounts_f = counts_f * ds_f * mid_f ** (-2.5)
-            normcounts_h = counts_h * ds_h * mid_h ** (-2.5)
-
-            sum_f = np.sum(normcounts_f)
-            sum_h = np.sum(normcounts_h)
-
-            if freq <= f0_f:
-                sumcounts = sum_f
-                mids = mid_f
-                normcounts = normcounts_f
-                edges = edg_f
-            elif freq >= f0_h:
-                sumcounts = sum_h
-                mids = mid_h
-                normcounts = normcounts_h
-                edges = edg_h
-
+            # WEIGHTING
+            dF = np.abs(freq - f0_f)
+            dH = np.abs(freq - f0_h)
+            fw1 = 1. - (np.abs(dF) / (dF + dH))
+            fw2 = 1. - (np.abs(dH) / (dF + dH))
+            if freq <= 154e6:
+                mids = np.array(fmid)
+                ncounts = np.array(fcounts)
+            elif freq >= 1400e6:
+                mids = np.array(hmid)
+                ncounts = np.array(hcounts)
             else:
-                # print bins
-                finc = inc / fr_f
-                hinc = inc / fr_h
-                franz_stats = linscale(freq, f0_f, low_f, upp_f, alpha, finc)
-                mid_f, ds_f, edg_f, mids_f = franz_stats[0], franz_stats[1], franz_stats[2], franz_stats[3]
-                hopkins_stats = linscale(freq, f0_h, low_h, upp_h, alpha, hinc)
-                mid_h, ds_h, edg_h, mids_h = hopkins_stats[0], hopkins_stats[1], hopkins_stats[2], hopkins_stats[3]
-                counts_f = franz_counts(mid_f)
-                counts_h = hopkins_counts(mid_h)
+                franz_upp = np.max(fmid)
+                franz_low = np.min(fmid)
+                hop_low = np.min(hmid)
+                hop_upp = np.max(hmid)
 
-                normcounts_f = counts_f * ds_f * mid_f ** (-2.5)
-                normcounts_h = counts_h * ds_h * mid_h ** (-2.5)
-
-                sum_f = np.sum(normcounts_f)
-                sum_h = np.sum(normcounts_h)
-
-                dF = np.abs(freq - f0_f)
-                dH = np.abs(freq - f0_h)
-                fw1 = 1 - (np.abs(dF) / (dF + dH))
-                fw2 = 1 - (np.abs(dH) / (dF + dH))
-                franz_upp = np.max(mids_f)
-                franz_low = np.min(mids_f)
-                hop_low = np.min(mids_h)
-                hop_upp = np.max(mids_h)
-
-                m1, m2, m3 = [], [], []
-                n1, n2, n3 = [], [], []
                 # OVERLAP
-                maskff = np.where((mids_f >= hop_low) & (mids_f <= hop_upp))
-                maskhh = np.where((mids_h >= franz_low) & (mids_h <= franz_upp))
-                m2 = (mids_f[maskff] * fw1) + (mids_h[maskhh] * fw2)
-                n2 = (normcounts_f[maskff] * fw1) + (normcounts_h[maskhh] * fw2)
-                mask_lim = np.where((m2 >= low) & (m2 <= upp))
-                m2 = m2[mask_lim]
-                n2 = n2[mask_lim]
-                if franz_upp < upp or franz_low > low or hop_upp < upp or hop_low > low:
-                    if franz_low > low:
-                        maskh = np.where((mids_h >= low) & (mids_h <= franz_low))
-                        n1 = normcounts_h[maskh]
-                        m1 = mids_h[maskh]
-                    elif franz_upp < upp:
-                        maskh = np.where((mids_h >= franz_upp) & (mids_h <= upp))
-                        n3 = normcounts_h[maskh]
-                    elif hop_low > low:
-                        maskf = np.where((mids_f <= hopp_low) & (mids_f >= low))
-                        n1 = normcounts_f[maskf]
-                        m1 = mids_f[maskf]
-                    elif hop_upp < upp:
-                        maskf = np.where((mids_f <= upp) & (mids_f >= hop_upp))
-                        n3 = normcounts_f[maskf]
-                        m3 = mids_f[maskf]
+                maskff = np.where((fmid >= hop_low) & (fmid <= hop_upp))
+                maskhh = np.where((hmid >= franz_low) & (hmid <= franz_upp))
+                m1 = (fmid[maskff] * fw1) + (hmid[maskhh] * fw2)
+                n1 = (fcounts[maskff] * fw1) + (hcounts[maskhh] * fw2)
+                # OUTER EDGES
+                maskf1 = np.where(fmid < hop_low)
+                m2 = fmid[maskf1]
+                n2 = fcounts[maskf1]
+                maskf2 = np.where(fmid > hop_upp)
+                m4 = fmid[maskf2]
+                n4 = fcounts[maskf2]
 
+                maskh1 = np.where(hmid < franz_low)
+                m3 = hmid[maskh1]
+                n3 = hcounts[maskh1]
+                maskh2 = np.where(hmid > franz_upp)
+                m5 = hmid[maskh2]
+                n5 = hcounts[maskh2]
 
-                normcounts = np.concatenate([n1, n2, n3])
-                mids = np.concatenate([m1, m2, m3])
-                sumcounts = np.sum(normcounts)
-                edges = mids - 0.5 * inc
-            return normcounts, sumcounts, mids, edges
-        norm_counts,  total_counts, mids, edges= scount(self.low_Flim, self.upp_Flim, 0.8, self.nu)
+                ncounts = np.concatenate([n2, n3, n1, n4, n5])
+                mids = np.concatenate([m2, m3, m1, m4, m5])
+                mids = np.array(mids)
+                ncounts = np.array(ncounts)
+
+            return mids, ncounts, np.sum(ncounts), fmid, hmid, fcounts, hcounts, ftotal, htotal
+
+        def limit(low, upp, freq=185e6, alpha=-0.8, inc=1e-4):
+            mids, ncounts, tcounts, fmid, hmid, fcounts, hcounts, ftotal, htotal = weight(freq, alpha, inc)
+            x = np.log10(mids)
+            y = np.log10(ncounts)
+            xf = np.log10(fmid)
+            yf = np.log10(fcounts)
+            xh = np.log10(hmid)
+            yh = np.log10(hcounts)
+            deg = 15
+            z = poly.polyfit(x, y, deg=deg)
+            zf = poly.polyfit(xf, yf, deg=deg)
+            zh = poly.polyfit(xh, yh, deg=deg)
+            x0 = np.arange(low, upp, inc)
+            x0 = np.log10(x0)
+            p = 10 ** poly.polyval(x0, z)
+            pf = 10 ** poly.polyval(x0, zf)
+            ph = 10 ** poly.polyval(x0, zh)
+            x0 = 10 ** x0
+            mids, edges, fmid, hmid = x0[:-1] + inc, x0, x0[:-1] + inc, x0[:-1] + inc
+            ncounts, fcounts, hcounts = p[:-1], pf[:-1], ph[:-1]
+            return mids, ncounts, np.sum(ncounts), edges
+
+        mids, norm_counts, total_counts, edges= limit(self.low_Flim, self.upp_Flim, self.nu, self.alpha)
         Area = self.area * (np.pi ** 2.) / (180. ** 2.)
         FLUX = []
         num_sources = norm_counts * Area
-        total_counts = total_counts * Area
+        tcounts = total_counts * Area
         for i in range(0, len(edges) - 1):
             count = num_sources[i]
             p = count - int(count)
@@ -247,7 +246,7 @@ class SIM(object):
 
         num_sources=self.flux_gen()[1]
 
-        num=num_sources*100.
+        num=num_sources*self.num_scale
         lim = int(num * 2.5)
         x = []
         y = []
