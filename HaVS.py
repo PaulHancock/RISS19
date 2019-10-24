@@ -21,7 +21,13 @@ SFG=0
 AGN=1
 stypes=[SFG, AGN]
 #sprobs=[0.84839, 1-0.84839] #0.15161
-sprobs=[1-0.84839,0.84839]
+#sprobs=[1-0.84839,0.84839]
+#Chetri2017 Strong Scint
+#sprobs=[1/-37./347.,37./347.]
+#Chetri2017 Strong + Mod Scint
+sprobs=[1.-(37.+91.)/347.,(37.+91.)/347.]
+
+
 parser = argparse.ArgumentParser()
 
 parser.add_argument('-FUL', action='store', dest='FUL', default=1.,
@@ -87,7 +93,7 @@ class SIM(object):
 
         #self.scount=float(results.scount)
 
-    def flux_gen(self, alpha=0.8):
+    def flux_gen(self):
         """
         Function to distribute flux across all points
         Input:  Flux Density limit, RA/DEC positions, source distribution function
@@ -245,9 +251,8 @@ class SIM(object):
         """
 
         num_sources=self.flux_gen()[1]
-
-        num=num_sources*self.num_scale
-        lim = int(num * 2.5)
+        num=num_sources*200.
+        lim = int(num)
         x = []
         y = []
         z = []
@@ -270,11 +275,11 @@ class SIM(object):
         #converting back to cartesian cooridantes
         theta = np.arccos(z / r0) * 180 / np.pi
         theta = theta - 90.
-        theta = theta[:num_sources]
+        theta = theta
         phi = np.arctan2(y, x) * 180. / (np.pi)
         phi = phi + 180.
-        phi = phi[:num_sources]
-        return phi, theta
+        phi = phi
+        return np.array(phi), np.array(theta)
 
     def region_gen(self, reg_file):
         """
@@ -283,58 +288,82 @@ class SIM(object):
         Output: List of RA/DEC inside the correct region.
         """
 
-        reg_ind = []
+        # reg_ra = []
+        # reg_dec = []
+        # region = cPickle.load(open(reg_file, 'rb'))
+        # flux, num=self.flux_gen()
+        # while len(reg_ra) < num:
+        #     RA, DEC = self.pos_gen()
+        #     reg_arr = region.sky_within(RA, DEC, degin=True)
+        #     reg_ra.extend(RA[reg_arr])
+        #     reg_dec.extend(DEC[reg_arr])
+
         reg_ra = []
         reg_dec = []
         region = cPickle.load(open(reg_file, 'rb'))
-        flux, num=self.flux_gen()
-        while len(reg_ind) < num:
+        flux, num = self.flux_gen()
+        while len(reg_ra) < num:
             RA, DEC = self.pos_gen()
-            reg_arr = region.sky_within(RA, DEC, degin=True)
-            for i in range(0, len(reg_arr)):
-                if len(reg_ra) < num:
-                    reg_ind.append(i)
-                    reg_ra.append(RA[i])
-                    reg_dec.append(DEC[i])
-        return np.array(reg_ra[:num]), np.array(reg_dec[:num]), flux, num
+            c = SkyCoord(l=RA*u.degree, b=DEC*u.degree, frame='galactic')
+            ra=c.fk5.ra.deg
+            dec=c.fk5.dec.deg
+            reg_arr = region.sky_within(ra, dec, degin=True)
+            print(max(RA), max(DEC))
+            #for i in range(0, len(reg_arr)):
+            reg_ra.extend(RA[reg_arr])
+            reg_dec.extend(DEC[reg_arr])
+        print(max(reg_ra), max(reg_dec))
+        reg_dec= np.array(reg_dec[:num])
+        reg_ra = np.array(reg_ra[:num])
+        return reg_ra, reg_dec, flux, num
 
-    def stype_gen(self,arr):
+    def stype_gen(self):
         """
         Function to determine if a source is of type compact or extended
         Input:  RA/DEC list (source_size?)
         Output: compact (1?) or extended (0?)
         """
-        stype_arr = []
-        for i in range(0, len(arr)):
-            stype_arr.append(np.random.choice(stypes, p=sprobs))
-        return stype_arr
+        ra,dec,flux=self.region_gen(self.region_name)[0:3]
+        arr=ra
 
-    def ssize_gen(self, stype):
+        stype_arr=(np.random.choice(stypes, p=sprobs, size=len(arr)))
+
+        return stype_arr, ra, dec, flux
+
+    def ssize_gen(self):
         """
         Generates source size based stype given.
         Input: Flux and source type
         Output: Source size
         """
+        stype,ra, dec, flux=self.stype_gen()
+        def ang_size(flux, freq, alpha=-0.8):
+            f0 = 1400e6
+            flux = np.array(flux)
+            fr = ((freq * 1.0) / f0) ** (alpha)
+            Sn = (flux) * fr
+            a = 2. * Sn ** 0.3
+            return a/3600., Sn
+        ssize_arr=ang_size(flux,freq=self.nu)[0]
+        ssize_arr=np.array(ssize_arr)
+        agn_mask = np.where(stype == 1)
 
-        ssize_arr=[]
-        for i in range(0, len(stype)):
 
-            if stype[i] == AGN:
-                #  milli arc secs
-                ssize_arr.append((0.5*1e-3)/3600.) #(0.0979/(3600.)) actual values
-            elif stype[i] == SFG:
-                #  milli arc secs
-                ssize_arr.append((10*1e-3)/3600.) #(0.2063/(3600.)) actual values
+        if len(agn_mask[0])>=1:
+            agn_ssize=(1e-3) / 3600.
+            ssize_arr[agn_mask]=agn_ssize
 
-        return np.array(ssize_arr)
+        return ssize_arr, stype, ra, dec ,flux
 
 
-    def output_gen(self, ra, dec, ssize):
+    def output_gen(self):
         """
         Function to use SM2017 to get Modulation, Timescale, Halpha, Theta and other values.
         Input: RA, DEC, Source Size
         Output: Modulation, Timescale, Halpha, Theta
+
         """
+        ssize, stype, ra, dec ,flux=self.ssize_gen()
         nu = np.float(self.nu)
         frame = 'galactic'
         #frame='fk5'
@@ -368,7 +397,8 @@ class SIM(object):
         #tau, err_tau=sm.get_tau(pos)
         tau=1
         err_tau=1
-        return m, err_m, t0, err_t0, Ha, err_Ha , theta, err_theta, tau, err_tau
+        print(max(m))
+        return m, err_m, t0, err_t0, Ha, err_Ha , theta, err_theta, tau, err_tau,ssize, stype, ra, dec ,flux
 
     def areal_gen(self):
         """
@@ -376,20 +406,20 @@ class SIM(object):
         Uses: Flux, Region, Stype, Ssize, Output (Ha, mod, t0, theta), Obs_Yrs
         Output: ASD, modulation, timescale, Ha, Theta
         """
-        RA, DEC, flux, num = self.region_gen(self.region_name)
 
-        #print('RA')
-        stype = self.stype_gen(RA)
-        ssize = self.ssize_gen(stype)
-        #print('SS')
-        mod, err_m, t0, err_t0, Ha, err_Ha, theta, err_theta, tau, err_tau= self.output_gen(RA, DEC, ssize)
+        #stype = self.stype_gen()
+        #ssize = self.ssize_gen()
+
+        mod, err_m, t0, err_t0, Ha, err_Ha, theta, err_theta, tau, err_tau,ssize, stype, RA, DEC ,flux= self.output_gen()
         obs_yrs = self.obs_time / (3600. * 24. * 365.25)
         t_mask=np.where(np.float(obs_yrs)<=t0)
         mod[t_mask] = mod[t_mask] * (np.float(obs_yrs)/ t0[t_mask])
         err_m[t_mask] = err_m[t_mask] * (np.float(obs_yrs) / t0[t_mask])
 
-        mp = np.random.normal(loc=mod, scale=err_m)
-
+        #mp = np.random.normal(loc=mod, scale=err_m)
+        print(np.max(mod))
+        mp= np.random.uniform(low=mod-err_m, high= mod+err_m)
+        print(np.max(mp))
         v_mask=np.where(mp*flux>=self.low_Flim*3.)
         m_mask=np.where(mp>=self.mod_cutoff)
         var_mask=np.where((mp*flux>=self.low_Flim*3.) & (mp>=self.mod_cutoff))
@@ -423,7 +453,7 @@ class SIM(object):
         #datatab1.add_column(Column(data=tau, name='Tau'))
         #datatab1.add_column(Column(data=err_tau, name='Tau err'))
         datatab1.write(datafile, overwrite=True)
-        return varareal, mp, t0, Ha, theta, flux, mareal, vareal, varareal
+        return varareal, mp, t0, Ha, theta, flux, mareal, vareal, varareal,ssize, stype, RA, DEC ,flux
 
     def repeat(self):
         """
@@ -441,6 +471,7 @@ class SIM(object):
 
         for i in range(0, self.loops):
             INPUT = self.areal_gen()
+            varareal, mp, t0, Ha, theta, flux, mareal, vareal, varareal, ssize, stype, RA, DEC, flux = INPUT
             areal_arr.append(INPUT[0])
             mod_arr[i,:]=[np.mean(INPUT[1]), np.std(INPUT[1])]
             t0_arr[i,:]=[np.mean(INPUT[2]), np.std(INPUT[2])]
@@ -451,7 +482,7 @@ class SIM(object):
         areal_arr = np.array(areal_arr)
         NSources = np.array(NSources)
 
-        return areal_arr, mod_arr,t0_arr, Ha_arr, theta_arr, count, NSources, self.area, self.low_Flim, self.upp_Flim, self.obs_time, self.nu, self.mod_cutoff
+        return areal_arr, mod_arr,t0_arr, Ha_arr, theta_arr, count, NSources, self.area, self.low_Flim, self.upp_Flim, self.obs_time, self.nu, self.mod_cutoff,ssize, stype, RA, DEC ,flux
 
 
 def test():
@@ -462,7 +493,7 @@ def test():
     """
 
     sim=SIM()
-    areal_arr, mod_arr, t0_arr, Ha_arr, theta_arr, count, NSources, area, low_Flim, upp_Flim, obs_time, nu, mod_cutoff=sim.repeat()
+    areal_arr, mod_arr, t0_arr, Ha_arr, theta_arr, count, NSources, area, low_Flim, upp_Flim, obs_time, nu, mod_cutoff,ssize, stype, RA, DEC ,flux=sim.repeat()
     datatab=Table()
     resultstab=Table()
     if outfile != False:
@@ -502,8 +533,12 @@ def test():
         print("Avg Areal: {0}".format(np.mean(areal_arr)))
         print("Iterations: {0}".format(len(areal_arr)))
         print("Num Sources: {0}".format(np.mean(NSources)))
-        print("Area: {0}".format(area))
+        print("Area: {0}".format(np.round(area,2)))
         print("Num Variable: {0}".format(np.mean(areal_arr)*area))
         print("% Variable: {0}".format(np.mean(areal_arr) * area*100./np.mean(NSources)))
+        print("Avg Modulation: {0}".format(np.round(np.mean(mod_arr),5)))
+        print("Avg TScatt: {0}".format(np.round(np.mean(theta_arr),5)))
+        print("Avg Source Size: {0}".format(np.round(np.mean(ssize),5)))
+
 
 test()
