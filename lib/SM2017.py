@@ -180,6 +180,7 @@ class SM(object):
         m = xi ** (-1. / 3.)
         err_m = (1. / 3.) * (err_xi / xi) * m
         theta, err_theta = self.get_theta(position)
+        ssize=np.zeros(len(m))+ssize
         mask = np.where(ssize > theta)
         m[mask] = m[mask] * (theta[mask] / ssize[mask]) ** (7. / 6.)
         err_m[mask] = np.sqrt((err_m[mask]/m[mask]) ** (2.0) + ((7. / 6.) * (err_theta[mask] / theta[mask])) ** 2.) * m[mask]
@@ -193,6 +194,7 @@ class SM(object):
         :param ssize: source size in deg
         :return:
         """
+        ssize = np.zeros(len(m)) + ssize
         xi, err_xi = self.get_xi(position)
         rf = self.get_rf(position)
         tref = rf * xi / self.v / SECONDS_PER_YEAR
@@ -215,6 +217,7 @@ class SM(object):
         :param ssize: source size in deg
         :return:
         """
+        ssize = np.zeros(len(m)) + ssize
         tref, err_tref = self.get_timescale(position, ssize=ssize)
         m, err_m = self.get_m(position, ssize=ssize)
 
