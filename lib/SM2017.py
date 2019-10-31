@@ -181,7 +181,6 @@ class SM(object):
         m = xi ** (-1. / 3.)
         err_m = (1. / 3.) * (err_xi / xi) * m
         theta, err_theta = self.get_theta(position)
-
         mask = np.where(ssize > theta)
         m[mask] = m[mask] * (theta[mask] / ssize[mask]) ** (7. / 6.)
         err_m[mask] = np.sqrt((err_m[mask]/m[mask]) ** (2.0) + ((7. / 6.) * (err_theta[mask] / theta[mask])) ** 2.) * m[mask]
@@ -201,7 +200,7 @@ class SM(object):
         rf = self.get_rf(position)
         tref = rf * xi / self.v / SECONDS_PER_YEAR
         err_tref = (err_xi/xi)*tref
-
+        ssize = np.zeros(len(xi)) + ssize
         # timescale is longer for 'large' sources
         theta, err_theta = self.get_theta(position)
         large = np.where(ssize > theta)
@@ -222,7 +221,6 @@ class SM(object):
         ssize = np.zeros(len(position)) + ssize
         tref, err_tref = self.get_timescale(position, ssize=ssize)
         m, err_m = self.get_m(position, ssize=ssize)
-
         short = np.where(nyears * SECONDS_PER_YEAR < tref)
         m[short] *= (nyears / tref[short])
         err_m[short] = np.sqrt((err_m[short]/m[short]) ** 2. + (err_tref[short] / tref[short]) ** 2.) * m[short]
