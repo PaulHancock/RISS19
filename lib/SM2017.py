@@ -104,7 +104,7 @@ class SM(object):
         """
         # The coordinates we request need to be the same as that in the WCS header
         # for the files in this repo, this currently means galactic coordinates.
-        x, y = zip(*self.wcs.all_world2pix(zip(position.galactic.l.degree, position.galactic.b.degree), 0))
+        x, y = zip(*self.wcs.all_world2pix(list(zip(position.galactic.l.degree, position.galactic.b.degree)), 0))
         x = np.int64(np.floor(x))
         x = np.clip(x, 0, self.hdu['NAXIS1'])
         y = np.int64(np.floor(y))
@@ -251,6 +251,7 @@ def test_all_params():
     print("sm = {0} (m^-17/3)".format(sm.get_sm(pos)[0]*sm.kpc))
     print("t0 = {0} (sec)".format(sm.get_timescale(pos)))
     print("r_diff = {0} (m)".format(sm.get_rdiff(pos)))
+    print("r_ref = {0} (m)".format(sm.get_rref(pos)))
     print("r_F = {0} (m)".format(sm.get_rf(pos)))
     print("rms = {0}".format(sm.get_rms_var(pos)))
     print("theta = {0} (rad)".format(np.radians(sm.get_theta(pos))))
@@ -308,7 +309,21 @@ def write_multi_pos():
     datatab1.write(datafile, overwrite=True)
 
 
+def test_get_distance_empty_mask():
+    print("Testing get_distance where the mask is empty")
+    sm = SM(os.path.join('data', 'Halpha_map.fits'), os.path.join('data', 'Halpha_error.fits'))
+    pos = SkyCoord([0, 0, 0, 12, 16, 20]*u.degree, [0.5, 1, 1.2, 90, 90, -90]*u.degree, frame='galactic')
+    print("Hα = {0}".format(sm.get_halpha(pos)))
+    print("ξ = {0}".format(sm.get_xi(pos)))
+    print("m = {0}".format(sm.get_m(pos)))
+    print("sm = {0}".format(sm.get_sm(pos)))
+    print("t0 = {0}".format(sm.get_timescale(pos)))
+    print("rms = {0}".format(sm.get_rms_var(pos)))
+    print("theta = {0}".format(sm.get_theta(pos)))
+    print("Distance = {0}".format(sm.get_distance(pos)))
+
+
 if __name__ == "__main__":
     test_all_params()
-    #test_multi_pos()
-    #write_multi_pos()
+    test_multi_pos()
+    test_get_distance_empty_mask()
