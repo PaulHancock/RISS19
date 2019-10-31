@@ -6,3 +6,5 @@
 *.sh
 *.mim
 data/*.fits
+*.fits
+plots/
