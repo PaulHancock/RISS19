@@ -1,4 +1,10 @@
 .idea
 *.pyc
+*.csv
+*.png
+*.ipynb
+*.sh
+*.mim
+data/*.fits
 *.fits
 plots/

@@ -176,11 +176,11 @@ class SM(object):
         :param ssize: source size in deg
         :return:
         """
+        ssize = np.zeros(len(position)) + ssize
         xi, err_xi = self.get_xi(position)
         m = xi ** (-1. / 3.)
         err_m = (1. / 3.) * (err_xi / xi) * m
         theta, err_theta = self.get_theta(position)
-        ssize=np.zeros(len(m))+ssize
         mask = np.where(ssize > theta)
         m[mask] = m[mask] * (theta[mask] / ssize[mask]) ** (7. / 6.)
         err_m[mask] = np.sqrt((err_m[mask]/m[mask]) ** (2.0) + ((7. / 6.) * (err_theta[mask] / theta[mask])) ** 2.) * m[mask]
@@ -196,6 +196,7 @@ class SM(object):
         """
 
         xi, err_xi = self.get_xi(position)
+        ssize = np.zeros(len(position)) + ssize
         rf = self.get_rf(position)
         tref = rf * xi / self.v / SECONDS_PER_YEAR
         err_tref = (err_xi/xi)*tref
@@ -217,11 +218,9 @@ class SM(object):
         :param ssize: source size in deg
         :return:
         """
-
+        ssize = np.zeros(len(position)) + ssize
         tref, err_tref = self.get_timescale(position, ssize=ssize)
         m, err_m = self.get_m(position, ssize=ssize)
-        ssize = np.zeros(len(m)) + ssize
-
         short = np.where(nyears * SECONDS_PER_YEAR < tref)
         m[short] *= (nyears / tref[short])
         err_m[short] = np.sqrt((err_m[short]/m[short]) ** 2. + (err_tref[short] / tref[short]) ** 2.) * m[short]
