@@ -54,12 +54,17 @@ class SM(object):
         self.v = v  # relative velocity of source/observer in m/s
         self.file = ha_file
         self.err_file = err_file
+        self.tau_file = "/home/elliottcharlton/PycharmProjects/SM2017/data/tau_map_near.fits"
         self._load_file()
+
+
 
     def _load_file(self):
         self.hdu = fits.getheader(self.file, ignore_missing_end=True)
         self.wcs = WCS(self.hdu)
         self.data = fits.open(self.file, memmap=True, ignore_missing_end=True)[0].data
+        self.thdu = fits.getheader(self.tau_file, ignore_missing_end=True)
+        self.tau = fits.open(self.tau_file, memmap=True, ignore_missing_end=True)[0].data
         if self.err_file:
             self.err_hdu = fits.getheader(self.err_file, ignore_missing_end=True)
             self.err_wcs = WCS(self.err_hdu)
@@ -69,32 +74,24 @@ class SM(object):
 
         return
 
-    def get_distance(self, position):
+    def get_tau(self, position):
         """
-        :param position: sky position
-        :return: Distance to scattering screen in kpc
+        Return the Halpha for a given location on the sky.
+        :param position: astropy.coordinates.SkyCoord
+        :return:
         """
-        if self.D is not None:
-            return np.ones(np.shape(position))*self.D
-        # TODO: sort out gal_r and find a reference for it
-        gal_r = 16.2  # kpc
-        sun_r = 8.09  # kpc
-        gal_h = 1.   # kpc
-        theta = position.galactic.l.radian # angle from the GC along the plane
-        phi = position.galactic.b.radian   # angle from the GC perp to the plane
-        far_edge = sun_r*np.cos(theta) + np.sqrt(gal_r**2 - (sun_r*np.sin(theta))**2)
-        top = (gal_h/2.) / np.abs(np.sin(phi))
-        mask = np.where(top > far_edge)
-        screen_dist = top
-        screen_dist[mask] = far_edge[mask]
-        return screen_dist/2.
-
-    def get_rf(self, position):
-        """
-        :param position: Sky position
-        :return: Fresnel scale in m
-        """
-        return np.sqrt(self.c * self.get_distance(position) * self.kpc / (2 * np.pi * self.nu))
+        # The coordinates we request need to be the same as that in the WCS header
+        # for the files in this repo, this currently means galactic coordinates.
+        x, y = zip(*self.wcs.all_world2pix(zip(position.galactic.l.degree, position.galactic.b.degree), 0))
+        x = np.int64(np.floor(x))
+        x = np.clip(x, 0, self.thdu['NAXIS1'])
+        y = np.int64(np.floor(y))
+        y = np.clip(y, 0, self.thdu['NAXIS2'])
+        tau = self.tau[y, x]
+        alpha = 3.86
+        tau = (tau / 1e3) * ((self.nu / 1e9) ** (-alpha))  # In seconds
+        err_tau = 0.1 * tau
+        return tau, err_tau
 
     def get_halpha(self, position):
         """
@@ -141,6 +138,17 @@ class SM(object):
         err_rdiff = abs((1 / (2 - self.beta)) * (err_sm2 / sm2) * rdiff)
         return rdiff, err_rdiff
 
+    def get_rf(self, position):
+        rdiff, err_rdiff = self.get_rdiff(position)
+        tau, err_tau = self.get_tau(position)
+
+        rf = rdiff * (4. * np.pi * self.nu * tau) ** (1. / 2.)
+
+        err_rf = ((err_rdiff / rdiff) ** 2.0 + (1. / 2. * (err_tau / tau)) ** 2.0) * rf
+        # rf = rdiff (m) x sqrt(tau(s) x nu(1/s))
+        # rf = metres
+        return rf, err_rf
+
 
     def get_xi(self, position):
         """
@@ -152,10 +160,10 @@ class SM(object):
         rdiff, err_rdiff = self.get_rdiff(position)
         # Narayan 1992, uses r_F/r_diff = \xi without explicitly stating that this is being done
         # Compare Narayan 1992 eq 3.5 with Walker 1998 eq 6
-        rf = self.get_rf(position)
+        rf, err_rf = self.get_rf(position)
         xi = rf / rdiff
-        err_xi = (err_rdiff/rdiff)*xi
-        return xi, err_xi
+        err_xi = np.sqrt((err_rdiff / rdiff) ** 2.0 + (err_rf / rf) ** 2.0) * xi
+        return np.array(xi),  np.array(err_xi)
 
     def get_theta(self, position):
         """
@@ -167,7 +175,7 @@ class SM(object):
         rdiff, err_rdiff = self.get_rdiff(position)
         theta = np.degrees((self.c/self.nu)/(2.* np.pi*rdiff))
         err_theta = np.degrees(err_rdiff / rdiff)*theta
-        return theta, err_theta
+        return  np.array(theta),  np.array(err_theta)
 
     def get_m(self, position, ssize=0):
         """
@@ -179,11 +187,13 @@ class SM(object):
         ssize = np.zeros(len(position)) + ssize
         xi, err_xi = self.get_xi(position)
         m = xi ** (-1. / 3.)
+        m= np.array([m])
         err_m = (1. / 3.) * (err_xi / xi) * m
         theta, err_theta = self.get_theta(position)
         mask = np.where(ssize > theta)
-        m[mask] = m[mask] * (theta[mask] / ssize[mask]) ** (7. / 6.)
-        err_m[mask] = np.sqrt((err_m[mask]/m[mask]) ** (2.0) + ((7. / 6.) * (err_theta[mask] / theta[mask])) ** 2.) * m[mask]
+        if len(mask[0])>0:
+            m[mask] = m[mask] * (theta[mask] / ssize[mask]) ** (7. / 6.)
+            err_m[mask] = np.sqrt((err_m[mask]/m[mask]) ** (2.0) + ((7. / 6.) * (err_theta[mask] / theta[mask])) ** 2.) * m[mask]
         return m, err_m
 
     def get_timescale(self, position, ssize=0):
@@ -197,14 +207,15 @@ class SM(object):
 
         xi, err_xi = self.get_xi(position)
         ssize = np.zeros(len(position)) + ssize
-        rf = self.get_rf(position)
+        rf, err_rf = self.get_rf(position)
         tref = rf * xi / self.v / SECONDS_PER_YEAR
-        err_tref = (err_xi/xi)*tref
+        err_tref = np.sqrt((err_xi / xi)**2.0 + (err_rf / rf)**2.0) * tref
         # timescale is longer for 'large' sources
         theta, err_theta = self.get_theta(position)
         large = np.where(ssize > theta)
-        tref[large] = tref[large] * ssize[large] / theta[large]
-        err_tref[large] = tref[large] * np.sqrt((err_tref[large]/tref[large])**2.  + (err_theta[large]/theta[large])**2.)
+        if len(large[0]) > 0:
+            tref[large] = tref[large] * ssize[large] / theta[large]
+            err_tref[large] = tref[large] * np.sqrt((err_tref[large]/tref[large])**2.  + (err_theta[large]/theta[large])**2.)
         return tref, err_tref
 
     def get_rms_var(self, position, ssize=0, nyears=1):
@@ -221,8 +232,9 @@ class SM(object):
         tref, err_tref = self.get_timescale(position, ssize=ssize)
         m, err_m = self.get_m(position, ssize=ssize)
         short = np.where(nyears * SECONDS_PER_YEAR < tref)
-        m[short] *= (nyears / tref[short])
-        err_m[short] = np.sqrt((err_m[short]/m[short]) ** 2. + (err_tref[short] / tref[short]) ** 2.) * m[short]
+        if len(short[0]) > 0:
+            m[short] *= (nyears / tref[short])
+            err_m[short] = np.sqrt((err_m[short]/m[short]) ** 2. + (err_tref[short] / tref[short]) ** 2.) * m[short]
         return m, err_m
 
     def get_vo(self, position):
@@ -231,12 +243,13 @@ class SM(object):
         :param position:
         :return: Transition frequency in GHz
         """
+        #np.sqrt(self.c * self.get_distance(position) * self.kpc / (2 * np.pi * self.nu))
         sm2, _ = self.get_sm(position)
         pow = (1 / (2 - self.beta))
         A = (2 ** (2 - self.beta) * (np.pi * self.re ** 2 * self.beta) * sm2 * self.kpc *
              gamma(-self.beta / 2) / gamma(self.beta / 2)) ** pow
-        D = self.get_distance(position)
-        vo = self.c * (np.sqrt(D*self.kpc/(2*np.pi)) / A)**(1/(0.5 - 2*pow))
+        rf, _=self.get_rf(position)
+        vo = self.c * (rf*np.sqrt(self.c/self.nu) / A)**(1/(0.5 - 2*pow))
         return vo/1e9
 
 
@@ -253,12 +266,10 @@ def test_all_params():
     print("sm = {0} (m^-17/3)".format(sm.get_sm(pos)[0]*sm.kpc))
     print("t0 = {0} (sec)".format(sm.get_timescale(pos)))
     print("r_diff = {0} (m)".format(sm.get_rdiff(pos)))
-    print("r_ref = {0} (m)".format(sm.get_rref(pos)))
     print("r_F = {0} (m)".format(sm.get_rf(pos)))
     print("rms = {0}".format(sm.get_rms_var(pos)))
     print("theta = {0} (rad)".format(np.radians(sm.get_theta(pos))))
     print("nu_0 = {0} (GHz)".format(sm.get_vo(pos)))
-    print("Distance = {0}".format(sm.get_distance(pos)))
 
 def test_multi_pos():
     print("Testing with list of positions")
@@ -274,7 +285,6 @@ def test_multi_pos():
     print("t0 = {0}".format(sm.get_timescale(pos)))
     print("rms = {0}".format(sm.get_rms_var(pos)))
     print("theta = {0}".format(sm.get_theta(pos)))
-    print("Distance = {0}".format(sm.get_distance(pos)))
 
 def write_multi_pos():
     from astropy.table import Table, Column
@@ -326,6 +336,6 @@ def test_get_distance_empty_mask():
 
 
 if __name__ == "__main__":
-    test_all_params()
+    #test_all_params()
     test_multi_pos()
-    test_get_distance_empty_mask()
+    #test_get_distance_empty_mask()
