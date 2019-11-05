@@ -54,12 +54,16 @@ class SM(object):
         self.v = v  # relative velocity of source/observer in m/s
         self.file = ha_file
         self.err_file = err_file
+        self.screendist_file = "/home/elliottcharlton/PycharmProjects/SM2017/data/screen_dist_map.fits"
         self._load_file()
 
     def _load_file(self):
         self.hdu = fits.getheader(self.file, ignore_missing_end=True)
         self.wcs = WCS(self.hdu)
         self.data = fits.open(self.file, memmap=True, ignore_missing_end=True)[0].data
+        self.thdu = fits.getheader(self.screendist_file, ignore_missing_end=True)
+        self.twcs = (WCS(self.thdu))
+        self.screendist = fits.open(self.screendist_file, memmap=True, ignore_missing_end=True)[0].data
         if self.err_file:
             self.err_hdu = fits.getheader(self.err_file, ignore_missing_end=True)
             self.err_wcs = WCS(self.err_hdu)
@@ -75,19 +79,20 @@ class SM(object):
         :return: Distance to scattering screen in kpc
         """
         if self.D is not None:
-            return np.ones(np.shape(position))*self.D
+            return np.ones(np.shape(position)) * self.D
         # TODO: sort out gal_r and find a reference for it
         gal_r = 16.2  # kpc
         sun_r = 8.09  # kpc
-        gal_h = 1.   # kpc
-        theta = position.galactic.l.radian # angle from the GC along the plane
-        phi = position.galactic.b.radian   # angle from the GC perp to the plane
-        far_edge = sun_r*np.cos(theta) + np.sqrt(gal_r**2 - (sun_r*np.sin(theta))**2)
-        top = (gal_h/2.) / np.abs(np.sin(phi))
+        gal_h = 1.  # kpc
+        theta = position.galactic.l.radian  # angle from the GC along the plane
+        phi = position.galactic.b.radian  # angle from the GC perp to the plane
+        far_edge = sun_r * np.cos(theta) + np.sqrt(gal_r ** 2 - (sun_r * np.sin(theta)) ** 2)
+        top = (gal_h / 2.) / np.abs(np.sin(phi))
         mask = np.where(top > far_edge)
         screen_dist = top
         screen_dist[mask] = far_edge[mask]
-        return screen_dist/2.
+        return screen_dist / 2.
+
 
     def get_rf(self, position):
         """
@@ -182,8 +187,9 @@ class SM(object):
         err_m = (1. / 3.) * (err_xi / xi) * m
         theta, err_theta = self.get_theta(position)
         mask = np.where(ssize > theta)
-        m[mask] = m[mask] * (theta[mask] / ssize[mask]) ** (7. / 6.)
-        err_m[mask] = np.sqrt((err_m[mask]/m[mask]) ** (2.0) + ((7. / 6.) * (err_theta[mask] / theta[mask])) ** 2.) * m[mask]
+        if len(mask[0]) > 0:
+            m[mask] = m[mask] * (theta[mask] / ssize[mask]) ** (7. / 6.)
+            err_m[mask] = np.sqrt((err_m[mask]/m[mask]) ** (2.0) + ((7. / 6.) * (err_theta[mask] / theta[mask])) ** 2.) * m[mask]
         return m, err_m
 
     def get_timescale(self, position, ssize=0):
@@ -198,16 +204,17 @@ class SM(object):
         xi, err_xi = self.get_xi(position)
         ssize = np.zeros(len(position)) + ssize
         rf = self.get_rf(position)
-        tref = rf * xi / self.v / SECONDS_PER_YEAR
+        tref = (((rf * xi) / self.v) / SECONDS_PER_YEAR) #IN YEARS
         err_tref = (err_xi/xi)*tref
         # timescale is longer for 'large' sources
         theta, err_theta = self.get_theta(position)
         large = np.where(ssize > theta)
-        tref[large] = tref[large] * ssize[large] / theta[large]
-        err_tref[large] = tref[large] * np.sqrt((err_tref[large]/tref[large])**2.  + (err_theta[large]/theta[large])**2.)
+        if len(large[0]) > 0:
+            tref[large] = tref[large] * ssize[large] / theta[large]
+            err_tref[large] = tref[large] * np.sqrt((err_tref[large]/tref[large])**2.  + (err_theta[large]/theta[large])**2.)
         return tref, err_tref
 
-    def get_rms_var(self, position, ssize=0, nyears=1):
+    def get_rms_var(self, position, ssize=0, nyears=1.):
         """
         calculate the expected modulation index observed when measured on nyears timescales
         at a given sky coord
@@ -220,9 +227,10 @@ class SM(object):
         ssize = np.zeros(len(position)) + ssize
         tref, err_tref = self.get_timescale(position, ssize=ssize)
         m, err_m = self.get_m(position, ssize=ssize)
-        short = np.where(nyears * SECONDS_PER_YEAR < tref)
-        m[short] *= (nyears / tref[short])
-        err_m[short] = np.sqrt((err_m[short]/m[short]) ** 2. + (err_tref[short] / tref[short]) ** 2.) * m[short]
+        short = np.where(nyears < tref)
+        if len(short[0]) > 0:
+            m[short] *= (nyears / tref[short])
+            err_m[short] = np.sqrt((err_m[short]/m[short]) ** 2. + (err_tref[short] / tref[short]) ** 2.) * m[short]
         return m, err_m
 
     def get_vo(self, position):

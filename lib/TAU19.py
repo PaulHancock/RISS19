@@ -54,7 +54,8 @@ class SM(object):
         self.v = v  # relative velocity of source/observer in m/s
         self.file = ha_file
         self.err_file = err_file
-        self.tau_file = "/home/elliottcharlton/PycharmProjects/SM2017/data/tau_map_near.fits"
+        #self.tau_file = "/home/elliottcharlton/PycharmProjects/SM2017/data/tau_map_near.fits"
+        self.tau_file = "/home/elliottcharlton/PycharmProjects/SM2017/data/tau_map.fits"
         self._load_file()
 
 
@@ -64,6 +65,7 @@ class SM(object):
         self.wcs = WCS(self.hdu)
         self.data = fits.open(self.file, memmap=True, ignore_missing_end=True)[0].data
         self.thdu = fits.getheader(self.tau_file, ignore_missing_end=True)
+        self.twcs=(WCS(self.thdu))
         self.tau = fits.open(self.tau_file, memmap=True, ignore_missing_end=True)[0].data
         if self.err_file:
             self.err_hdu = fits.getheader(self.err_file, ignore_missing_end=True)
@@ -82,14 +84,15 @@ class SM(object):
         """
         # The coordinates we request need to be the same as that in the WCS header
         # for the files in this repo, this currently means galactic coordinates.
-        x, y = zip(*self.wcs.all_world2pix(zip(position.galactic.l.degree, position.galactic.b.degree), 0))
+        x, y = zip(*self.twcs.all_world2pix(zip(position.galactic.l.degree, position.galactic.b.degree), 0))
         x = np.int64(np.floor(x))
         x = np.clip(x, 0, self.thdu['NAXIS1'])
         y = np.int64(np.floor(y))
         y = np.clip(y, 0, self.thdu['NAXIS2'])
         tau = self.tau[y, x]
-        alpha = 3.86
-        tau = (tau / 1e3) * ((self.nu / 1e9) ** (-alpha))  # In seconds
+        alpha = 4.
+        #YMW16 assumes nu^-4 scaling for tau
+        tau = (tau) * ((self.nu / 1e9) ** (-alpha))  # In seconds
         err_tau = 0.1 * tau
         return tau, err_tau
 
@@ -187,7 +190,6 @@ class SM(object):
         ssize = np.zeros(len(position)) + ssize
         xi, err_xi = self.get_xi(position)
         m = xi ** (-1. / 3.)
-        m= np.array([m])
         err_m = (1. / 3.) * (err_xi / xi) * m
         theta, err_theta = self.get_theta(position)
         mask = np.where(ssize > theta)
@@ -231,7 +233,7 @@ class SM(object):
         ssize = np.zeros(len(position)) + ssize
         tref, err_tref = self.get_timescale(position, ssize=ssize)
         m, err_m = self.get_m(position, ssize=ssize)
-        short = np.where(nyears * SECONDS_PER_YEAR < tref)
+        short = np.where(nyears < tref)
         if len(short[0]) > 0:
             m[short] *= (nyears / tref[short])
             err_m[short] = np.sqrt((err_m[short]/m[short]) ** 2. + (err_tref[short] / tref[short]) ** 2.) * m[short]
