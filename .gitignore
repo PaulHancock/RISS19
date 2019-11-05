@@ -8,3 +8,5 @@
 data/*.fits
 *.fits
 plots/
+Halpha_map.fits
+Halpha_error.fits
