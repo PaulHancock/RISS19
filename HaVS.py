@@ -8,7 +8,7 @@ import numpy.polynomial.polynomial as poly
 from astropy.coordinates import SkyCoord
 from astropy.table import Table, Column
 import astropy.units as u
-from lib.new_SM17 import SM
+from lib.SM2017 import SM
 from astropy.utils.exceptions import AstropyWarning
 import warnings
 warnings.filterwarnings("ignore")
@@ -338,6 +338,7 @@ class SIM(object):
         """
         stype,ra, dec, flux=self.stype_gen()
         def ang_size(flux, freq, alpha=-0.8):
+            flux=flux*1e3 #convertin from Jy to mJy
             f0 = 1400e6
             flux = np.array(flux)
             fr = ((freq * 1.0) / f0) ** (alpha)

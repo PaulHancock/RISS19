@@ -261,7 +261,6 @@ def test_all_params():
     print("sm = {0} (m^-17/3)".format(sm.get_sm(pos)[0]*sm.kpc))
     print("t0 = {0} (sec)".format(sm.get_timescale(pos)))
     print("r_diff = {0} (m)".format(sm.get_rdiff(pos)))
-    print("r_ref = {0} (m)".format(sm.get_rref(pos)))
     print("r_F = {0} (m)".format(sm.get_rf(pos)))
     print("rms = {0}".format(sm.get_rms_var(pos)))
     print("theta = {0} (rad)".format(np.radians(sm.get_theta(pos))))
@@ -334,6 +333,6 @@ def test_get_distance_empty_mask():
 
 
 if __name__ == "__main__":
-    test_all_params()
+    #test_all_params()
     test_multi_pos()
-    test_get_distance_empty_mask()
+    #test_get_distance_empty_mask()
