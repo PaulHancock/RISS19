@@ -48,24 +48,18 @@ class SM(object):
         self.lo = 1e18/(self.kpc*1e-3)  # 1e18m expressed in pc (also armstrong_electron_1985 !)
         self.eps = 1
         self.D = d  # kpc - distance to the screen
-        self.z = 0.
         self.c = c.value
         self.beta = 11/3
         self.re = 2.817e-15  # m
         self.v = v  # relative velocity of source/observer in m/s
         self.file = ha_file
         self.err_file = err_file
-        self.screendist_file = "/home/elliottcharlton/PycharmProjects/SM2017/data/screen_dist_map.fits"
         self._load_file()
 
     def _load_file(self):
         self.hdu = fits.getheader(self.file, ignore_missing_end=True)
         self.wcs = WCS(self.hdu)
         self.data = fits.open(self.file, memmap=True, ignore_missing_end=True)[0].data
-
-        self.thdu = fits.getheader(self.screendist_file, ignore_missing_end=True)
-        self.twcs = (WCS(self.thdu))
-        self.screendist = fits.open(self.screendist_file, memmap=True, ignore_missing_end=True)[0].data
         if self.err_file:
             self.err_hdu = fits.getheader(self.err_file, ignore_missing_end=True)
             self.err_wcs = WCS(self.err_hdu)
@@ -80,13 +74,20 @@ class SM(object):
         :param position: sky position
         :return: Distance to scattering screen in kpc
         """
-        x, y = zip(*self.twcs.all_world2pix(zip(position.galactic.l.degree, position.galactic.b.degree), 0))
-        x = np.int64(np.floor(x))
-        x = np.clip(x, 0, self.thdu['NAXIS1'])
-        y = np.int64(np.floor(y))
-        y = np.clip(y, 0, self.thdu['NAXIS2'])
-        distance = self.screendist[y, x]
-        return distance/1e3
+        if self.D is not None:
+            return np.ones(np.shape(position))*self.D
+        # TODO: sort out gal_r and find a reference for it
+        gal_r = 16.2  # kpc
+        sun_r = 8.09  # kpc
+        gal_h = 1.   # kpc
+        theta = position.galactic.l.radian # angle from the GC along the plane
+        phi = position.galactic.b.radian   # angle from the GC perp to the plane
+        far_edge = sun_r*np.cos(theta) + np.sqrt(gal_r**2 - (sun_r*np.sin(theta))**2)
+        top = (gal_h/2.) / np.abs(np.sin(phi))
+        mask = np.where(top > far_edge)
+        screen_dist = top
+        screen_dist[mask] = far_edge[mask]
+        return screen_dist/2.
 
     def get_rf(self, position):
         """
@@ -103,7 +104,7 @@ class SM(object):
         """
         # The coordinates we request need to be the same as that in the WCS header
         # for the files in this repo, this currently means galactic coordinates.
-        x, y = zip(*self.wcs.all_world2pix(list(zip(position.galactic.l.degree, position.galactic.b.degree)), 0))
+        x, y = zip(*self.wcs.all_world2pix(zip(position.galactic.l.degree, position.galactic.b.degree), 0))
         x = np.int64(np.floor(x))
         x = np.clip(x, 0, self.hdu['NAXIS1'])
         y = np.int64(np.floor(y))
@@ -120,12 +121,13 @@ class SM(object):
         :return:
         """
         iha, err_iha = self.get_halpha(position)
+        iha=np.logspace(0,)
         # Cordes2002
         sm2 = iha / 198 * self.t4 ** 0.9 * self.eps ** 2 / (1 + self.eps ** 2) * self.lo ** (-2 / 3)
         err_sm2 = (err_iha / iha) * sm2
         return sm2, err_sm2
 
-    def get_rdiff(self, position, zl=0):
+    def get_rdiff(self, position):
         """
         Calculate the diffractive scale at the given sky coord
         :param position: astropy.coordinates.SkyCoord
@@ -135,7 +137,7 @@ class SM(object):
         # ^ units are kpc m^{-20/3}, but we want m^{-17/3} so we have to multiply by kpc below
         # r_diff as per Mcquart & Koay 2013, eq 7a.
         rdiff = (2 ** (2 - self.beta) * (
-                    np.pi * self.re ** 2 * (self.c / self.nu) ** 2 * self.beta)/((1+zl)**2) * sm2 * self.kpc *
+                    np.pi * self.re ** 2 * (self.c / self.nu) ** 2 * self.beta) * sm2 * self.kpc *
                  gamma(-self.beta / 2) / gamma(self.beta / 2)) ** (1 / (2 - self.beta))
         err_rdiff = abs((1 / (2 - self.beta)) * (err_sm2 / sm2) * rdiff)
         return rdiff, err_rdiff
@@ -165,7 +167,6 @@ class SM(object):
         # See Narayan 1992 eq 4.10 and discussion immediately prior
         rdiff, err_rdiff = self.get_rdiff(position)
         theta = np.degrees((self.c/self.nu)/(2.* np.pi*rdiff))
-
         err_theta = np.degrees(err_rdiff / rdiff)*theta
         return theta, err_theta
 
@@ -176,15 +177,13 @@ class SM(object):
         :param ssize: source size in deg
         :return:
         """
-        ssize = np.zeros(len(position)) + ssize
         xi, err_xi = self.get_xi(position)
         m = xi ** (-1. / 3.)
         err_m = (1. / 3.) * (err_xi / xi) * m
         theta, err_theta = self.get_theta(position)
         mask = np.where(ssize > theta)
-        if len(mask[0]) > 0:
-            m[mask] = m[mask] * (theta[mask] / ssize[mask]) ** (7. / 6.)
-            err_m[mask] = np.sqrt((err_m[mask]/m[mask]) ** (2.0) + ((7. / 6.) * (err_theta[mask] / theta[mask])) ** 2.) * m[mask]
+        m[mask] = m[mask] * (theta[mask] / ssize[mask]) ** (7. / 6.)
+        err_m[mask] = np.sqrt((err_m[mask]/m[mask]) ** (2.0) + ((7. / 6.) * (err_theta[mask] / theta[mask])) ** 2.) * m[mask]
         return m, err_m
 
     def get_timescale(self, position, ssize=0):
@@ -195,21 +194,19 @@ class SM(object):
         :param ssize: source size in deg
         :return:
         """
-
         xi, err_xi = self.get_xi(position)
-        ssize = np.zeros(len(position)) + ssize
         rf = self.get_rf(position)
         tref = rf * xi / self.v / SECONDS_PER_YEAR
         err_tref = (err_xi/xi)*tref
+
         # timescale is longer for 'large' sources
         theta, err_theta = self.get_theta(position)
         large = np.where(ssize > theta)
-        if len(large[0]) > 0:
-            tref[large] = tref[large] * ssize[large] / theta[large]
-            err_tref[large] = tref[large] * np.sqrt((err_tref[large]/tref[large])**2.  + (err_theta[large]/theta[large])**2.)
+        tref[large] = tref[large] * ssize[large] / theta[large]
+        err_tref[large] = tref[large] * np.sqrt((err_tref[large]/tref[large])**2.  + (err_theta[large]/theta[large])**2.)
         return tref, err_tref
 
-    def get_rms_var(self, position, ssize=0, nyears=1.):
+    def get_rms_var(self, position, ssize=0, nyears=1):
         """
         calculate the expected modulation index observed when measured on nyears timescales
         at a given sky coord
@@ -219,13 +216,12 @@ class SM(object):
         :param ssize: source size in deg
         :return:
         """
-        ssize = np.zeros(len(position)) + ssize
         tref, err_tref = self.get_timescale(position, ssize=ssize)
         m, err_m = self.get_m(position, ssize=ssize)
-        short = np.where(nyears < tref)
-        if len(short[0]) > 0:
-            m[short] *= (nyears / tref[short])
-            err_m[short] = np.sqrt((err_m[short] / m[short]) ** 2. + (err_tref[short] / tref[short]) ** 2.) * m[short]
+
+        short = np.where(nyears * SECONDS_PER_YEAR < tref)
+        m[short] *= (nyears / tref[short])
+        err_m[short] = np.sqrt((err_m[short]/m[short]) ** 2. + (err_tref[short] / tref[short]) ** 2.) * m[short]
         return m, err_m
 
     def get_vo(self, position):
@@ -240,8 +236,7 @@ class SM(object):
              gamma(-self.beta / 2) / gamma(self.beta / 2)) ** pow
         D = self.get_distance(position)
         vo = self.c * (np.sqrt(D*self.kpc/(2*np.pi)) / A)**(1/(0.5 - 2*pow))
-        return np.array(vo/1e9), _
-
+        return vo/1e9
 
 
 def test_all_params():
@@ -250,7 +245,7 @@ def test_all_params():
     #sm = SM(os.path.join('data', 'Halpha_map.fits'), os.path.join('data', 'Halpha_error.fits'), nu=1e8)
     #new map
     sm = SM(os.path.join('data', 'Ha_map_new.fits'), os.path.join('data', 'Ha_err_new.fits'), nu=1e8)
-    pos = SkyCoord([0], [0], frame='galactic', unit=(u.degree, u.degree))
+    pos = SkyCoord([0], [0], unit=(u.hour, u.degree))
     print("Hα = {0}".format(sm.get_halpha(pos)))
     print("ξ = {0}".format(sm.get_xi(pos)))
     print("m = {0}".format(sm.get_m(pos)))
@@ -268,10 +263,9 @@ def test_multi_pos():
     # original map
     # sm = SM(os.path.join('data', 'Halpha_map.fits'), os.path.join('data', 'Halpha_error.fits'), nu=1e8)
     # new map
-    sm = SM(os.path.join('data', 'Ha_map_new.fits'), os.path.join('data', 'Ha_err_new.fits'), nu=227e6)
-    pos = SkyCoord([0, 0, 180, 12, 16, 347.80787709]*u.degree, [0, -90, 0, 45, 90, -84.07209371]*u.degree, frame='galactic')
+    sm = SM(os.path.join('data', 'Ha_map_new.fits'), os.path.join('data', 'Ha_err_new.fits'), nu=1e8)
+    pos = SkyCoord([0, 4, 8, 12, 16, 20]*u.hour, [-90, -45, 0, 45, 90, -26]*u.degree)
     print("Hα = {0}".format(sm.get_halpha(pos)))
-    print("rdiff_ = {0}".format(sm.get_rdiff(pos)))
     print("ξ = {0}".format(sm.get_xi(pos)))
     print("m = {0}".format(sm.get_m(pos)))
     print("sm = {0}".format(sm.get_sm(pos)))
@@ -279,8 +273,7 @@ def test_multi_pos():
     print("rms = {0}".format(sm.get_rms_var(pos)))
     print("theta = {0}".format(sm.get_theta(pos)))
     print("Distance = {0}".format(sm.get_distance(pos)))
-    print("nu_0 = {0} (GHz)".format(sm.get_vo(pos)))
-    print("rd/rf = {0}".format(np.log10(sm.get_rdiff(pos)/sm.get_rf(pos))))
+
 def write_multi_pos():
     from astropy.table import Table, Column
     RA=np.append(np.arange(0,360),np.arange(0,360))
@@ -316,21 +309,7 @@ def write_multi_pos():
     datatab1.write(datafile, overwrite=True)
 
 
-def test_get_distance_empty_mask():
-    print("Testing get_distance where the mask is empty")
-    sm = SM(os.path.join('data', 'Halpha_map.fits'), os.path.join('data', 'Halpha_error.fits'))
-    pos = SkyCoord([0, 0, 0, 12, 16, 20]*u.degree, [0.5, 1, 1.2, 90, 90, -90]*u.degree, frame='galactic')
-    print("Hα = {0}".format(sm.get_halpha(pos)))
-    print("ξ = {0}".format(sm.get_xi(pos)))
-    print("m = {0}".format(sm.get_m(pos)))
-    print("sm = {0}".format(sm.get_sm(pos)))
-    print("t0 = {0}".format(sm.get_timescale(pos)))
-    print("rms = {0}".format(sm.get_rms_var(pos)))
-    print("theta = {0}".format(sm.get_theta(pos)))
-    print("Distance = {0}".format(sm.get_distance(pos)))
-
-
 if __name__ == "__main__":
-    #test_all_params()
-    test_multi_pos()
-    #test_get_distance_empty_mask()
+    test_all_params()
+    #test_multi_pos()
+    #write_multi_pos()

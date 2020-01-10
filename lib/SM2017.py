@@ -272,9 +272,10 @@ def test_multi_pos():
     # original map
     # sm = SM(os.path.join('data', 'Halpha_map.fits'), os.path.join('data', 'Halpha_error.fits'), nu=1e8)
     # new map
-    sm = SM(os.path.join('data', 'Ha_map_new.fits'), os.path.join('data', 'Ha_err_new.fits'), nu=1e8)
-    pos = SkyCoord([0, 4, 8, 12, 16, 20]*u.hour, [-90, -45, 0, 45, 90, -26]*u.degree)
+    sm = SM(os.path.join('data', 'Ha_map_new.fits'), os.path.join('data', 'Ha_err_new.fits'), nu=185e6)
+    pos = SkyCoord([0, 0, 180, 12, 16, 20]*u.degree, [-90, 0, 0, 45, 90, -26]*u.degree, frame='galactic')
     print("Hα = {0}".format(sm.get_halpha(pos)))
+    print("rdiff = {0}".format(sm.get_rdiff(pos)))
     print("ξ = {0}".format(sm.get_xi(pos)))
     print("m = {0}".format(sm.get_m(pos)))
     print("sm = {0}".format(sm.get_sm(pos)))

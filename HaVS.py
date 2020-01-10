@@ -8,7 +8,9 @@ import numpy.polynomial.polynomial as poly
 from astropy.coordinates import SkyCoord
 from astropy.table import Table, Column
 import astropy.units as u
-from lib.SM2017 import SM
+#from lib.SM2017 import SM
+#from lib.TAU19 import SM
+from lib.SM2017_dist import SM
 from astropy.utils.exceptions import AstropyWarning
 import warnings
 warnings.filterwarnings("ignore")
@@ -25,8 +27,8 @@ stypes=[SFG, AGN]
 #Chetri2017 Strong Scint
 #sprobs=[1/-37./347.,37./347.]
 #Chetri2017 Strong + Mod Scint
-sprobs=[1.-(37.+91.)/347.,(37.+91.)/347.]
-
+#sprobs=[1.-(37.+91.)/347.,(37.+91.)/347.]
+sprobs=[0,1]
 
 parser = argparse.ArgumentParser()
 
@@ -38,8 +40,6 @@ parser.add_argument('-mc', action='store', dest='mc', default=0.05,
                     help='Store modulation cut off value')
 parser.add_argument('-t', action='store', dest='obs_time', default=365.,
                     help='observation time in days')
-parser.add_argument('-a', action='store', dest='a', default=3300.,
-                    help='Scaling Constant for source counts')
 #parser.add_argument('-scount', action='store', dest='scount', default=False, help='Number of sources')
 parser.add_argument('-f', action='store', dest='nu', default=185.,
                     help='Frequency in MHz')
@@ -47,15 +47,19 @@ parser.add_argument('-i', action='store', dest='loops', default=20,
                     help='Number of iterations to run program through (30+ recommended)')
 parser.add_argument('-reg', action='store', dest='region_name',
                     help='read in region file')
-parser.add_argument('-map', action='store', dest='map', default=0,
+parser.add_argument('-map', action='store', dest='map', default=1,
                     help='Select old (0) or new (1) Ha maps')
 parser.add_argument('--out', dest='outfile', default=False, type=str,
                         help="Output file name for results including file type (.csv)")
 parser.add_argument('--fig', dest='figure', default=False,
                         help="Save Figure?")
-
+parser.add_argument('--CR', dest='CR', default=None,type=float,
+                        help="Centre RA point")
+parser.add_argument('--CD', dest='CD', default=None,type=float,
+                        help="Centre DEC point")
 parser.add_argument('--version', action='version', version='%(prog)s 1.0')
 
+itera=0
 results = parser.parse_args()
 outfile=results.outfile
 class SIM(object):
@@ -69,11 +73,12 @@ class SIM(object):
         else:
             self.log=log
         #Variables
+        self.itera=0
         self.figure=results.figure
         self.nu = np.float(results.nu) * 1e6 #Hz, Default 185 MHz
         self.arcsec = np.pi / (180. * 3600.)
         self.mod_cutoff = np.float(results.mc) #Default 0.05
-        self.low_Flim = np.float(results.FLL)  # Jy, Default 50e-3 Jy
+        self.low_Flim = np.float(results.FLL)*3  # Jy, Default 50e-3 Jy
         self.upp_Flim = np.float(results.FUL) # Jy, Default 1 Jy
         self.region_name = results.region_name
         region=cPickle.load(open(self.region_name, 'rb'))
@@ -81,9 +86,10 @@ class SIM(object):
         self.obs_time = np.float(results.obs_time) * 24. * 60. * 60. # seconds, Default 183 days
         self.loops=np.int(results.loops) #Default 20
         self.num_scale=40
-        self.a=np.float(results.a) #Default 3300
         self.map=float(results.map)
         self.alpha=-0.8
+        self.CD=results.CD
+        self.CR=results.CR
         if self.map==1:
             self.ha_file = 'Ha_map_new.fits'
             self.err_file = 'Ha_err_new.fits'
@@ -168,10 +174,10 @@ class SIM(object):
             dH = np.abs(freq - f0_h)
             fw1 = 1. - (np.abs(dF) / (dF + dH))
             fw2 = 1. - (np.abs(dH) / (dF + dH))
-            if freq <= 154e6:
+            if freq <= f0_f:
                 mids = np.array(fmid)
                 ncounts = np.array(fcounts)
-            elif freq >= 1400e6:
+            elif freq >= f0_h:
                 mids = np.array(hmid)
                 ncounts = np.array(hcounts)
             else:
@@ -234,13 +240,16 @@ class SIM(object):
         FLUX = []
         num_sources = norm_counts * Area
         tcounts = total_counts * Area
+        #print(len(edges))
         for i in range(0, len(edges) - 1):
             count = num_sources[i]
             p = count - int(count)
             leftover_count = np.random.choice([0, 1], p=[1 - p, p])
             count = int(count) + leftover_count
+            #print(count)
             FLUX.extend(np.random.uniform(edges[i], edges[i + 1], size=int(count)))
         flux_arr = np.random.permutation(np.array(FLUX))
+        #print(len(flux_arr))
         return flux_arr, len(flux_arr)
 
     def pos_gen(self):
@@ -249,36 +258,53 @@ class SIM(object):
         Input:  Number of points to generate from flux_gen function
         Output: List of RA/DEC (2,1) array in (2D) Cartesian coordiantes.
         """
+        num_sources = self.flux_gen()[1]
+        num_scale = self.area / (180. * 360.)
+        if self.area <= 5. and self.CR != None:
+            N=num_sources*1e3
+            N=int(N)
+            circle_r = 7
+            # center of the circle (x, y)
+            circle_x = self.CR
+            circle_y = self.CD
+            alpha = 2. * np.pi * np.random.random(N)
+            # print alpha
+            # random radius
+            r = circle_r * np.sqrt(np.random.random(N))
+            # calculating coordinates
+            x = r * np.cos(alpha) + circle_x
+            y = r * np.sin(alpha) + circle_y
+            phi = x
+            theta= y
+        else:
+            num =num_sources/num_scale
+            #print(num_sources, num_scale, num)
+            lim = int(num)
+            x = []
+            y = []
+            z = []
+            r = []
+            i = 0
+            #Generating cube
+            x1 = np.array(np.random.uniform(-1.0, 1.0, lim))
+            y1 = np.array(np.random.uniform(-1.0, 1.0, lim))
+            z1 = np.array(np.random.uniform(-1.0, 1.0, lim))
+            rad = (x1 ** 2.0 + y1 ** 2.0 + z1 ** 2.0) ** (0.5)
+            #Getting points inside sphere of radius 1
+            x = x1[np.where(rad <= 1)]
+            y = y1[np.where(rad <= 1)]
+            z = z1[np.where(rad <= 1)]
+            r = rad[np.where(rad <= 1)]
+            x, y, z = np.array(x) / np.array(r), np.array(y) / np.array(r), np.array(z) / np.array(r)
+            r0 = (x ** 2.0 + y ** 2.0 + z ** 2.0) ** 0.5
+            #converting back to cartesian cooridantes
+            theta = np.arccos(z / r0) * (180. / np.pi)
+            theta = theta - 90.
+            theta = theta
+            phi = np.arctan2(y, x) * (180. / np.pi)
+            phi = phi + 180.
+            phi = phi
 
-        num_sources=self.flux_gen()[1]
-        num=num_sources*200.
-        lim = int(num)
-        x = []
-        y = []
-        z = []
-        r = []
-        i = 0
-        #Generating cube
-        x1 = np.array(np.random.uniform(-1.0, 1.0, lim))
-        y1 = np.array(np.random.uniform(-1.0, 1.0, lim))
-        z1 = np.array(np.random.uniform(-1.0, 1.0, lim))
-        rad = (x1 ** 2.0 + y1 ** 2.0 + z1 ** 2.0) ** (0.5)
-        #Getting points inside sphere of radius 1
-        for i in range(0, len(rad)):
-            if rad[i] <= 1.:
-                x.append(x1[i])
-                y.append(y1[i])
-                z.append(z1[i])
-                r.append(rad[i])
-        x, y, z = np.array(x) / np.array(r), np.array(y) / np.array(r), np.array(z) / np.array(r)
-        r0 = (x ** 2.0 + y ** 2.0 + z ** 2.0) ** 0.5
-        #converting back to cartesian cooridantes
-        theta = np.arccos(z / r0) * 180 / np.pi
-        theta = theta - 90.
-        theta = theta
-        phi = np.arctan2(y, x) * 180. / (np.pi)
-        phi = phi + 180.
-        phi = phi
         return np.array(phi), np.array(theta)
 
     def region_gen(self, reg_file):
@@ -287,32 +313,21 @@ class SIM(object):
         Input:  RA/DEC positions and MIMAS region file.
         Output: List of RA/DEC inside the correct region.
         """
-
-        # reg_ra = []
-        # reg_dec = []
-        # region = cPickle.load(open(reg_file, 'rb'))
-        # flux, num=self.flux_gen()
-        # while len(reg_ra) < num:
-        #     RA, DEC = self.pos_gen()
-        #     reg_arr = region.sky_within(RA, DEC, degin=True)
-        #     reg_ra.extend(RA[reg_arr])
-        #     reg_dec.extend(DEC[reg_arr])
-
         reg_ra = []
         reg_dec = []
         region = cPickle.load(open(reg_file, 'rb'))
         flux, num = self.flux_gen()
+        run_count=0
         while len(reg_ra) < num:
+            #print(run_count, len(reg_ra),np.shape(reg_ra), len(reg_dec), num)
             RA, DEC = self.pos_gen()
-            c = SkyCoord(l=RA*u.degree, b=DEC*u.degree, frame='galactic')
+            c = SkyCoord(RA*u.degree, DEC*u.degree, frame='fk5')
             ra=c.fk5.ra.deg
             dec=c.fk5.dec.deg
             reg_arr = region.sky_within(ra, dec, degin=True)
-            print(max(RA), max(DEC))
-            #for i in range(0, len(reg_arr)):
             reg_ra.extend(RA[reg_arr])
             reg_dec.extend(DEC[reg_arr])
-        print(max(reg_ra), max(reg_dec))
+            run_count=run_count+1
         reg_dec= np.array(reg_dec[:num])
         reg_ra = np.array(reg_ra[:num])
         return reg_ra, reg_dec, flux, num
@@ -341,7 +356,7 @@ class SIM(object):
             flux=flux*1e3 #convertin from Jy to mJy
             f0 = 1400e6
             flux = np.array(flux)
-            fr = ((freq * 1.0) / f0) ** (alpha)
+            fr = ((f0 * 1.0) / freq) ** (alpha)
             Sn = (flux) * fr
             a = 2. * Sn ** 0.3
             return a/3600., Sn
@@ -366,8 +381,8 @@ class SIM(object):
         """
         ssize, stype, ra, dec ,flux=self.ssize_gen()
         nu = np.float(self.nu)
-        frame = 'galactic'
-        #frame='fk5'
+        #frame = 'galactic'
+        frame='fk5'
         tab = Table()
 
         # create the sky coordinate
@@ -388,17 +403,16 @@ class SIM(object):
         #sm, err_sm = sm.get_sm(pos)
         # mod
 
-        m, err_m = sm.get_m(pos, ssize)
+        #m, err_m = sm.get_m(pos, ssize)
         # t0
         t0, err_t0 = sm.get_timescale(pos,ssize)
         # rms
         #val6, err6 = sm.get_rms_var(pos, stype, ssize)
-
+        m, err_m = sm.get_rms_var(pos, ssize, nyears=self.obs_time/(3600. * 24. * 365.25))
         #tau
         #tau, err_tau=sm.get_tau(pos)
         tau=1
         err_tau=1
-        print(max(m))
         return m, err_m, t0, err_t0, Ha, err_Ha , theta, err_theta, tau, err_tau,ssize, stype, ra, dec ,flux
 
     def areal_gen(self):
@@ -408,9 +422,6 @@ class SIM(object):
         Output: ASD, modulation, timescale, Ha, Theta
         """
 
-        #stype = self.stype_gen()
-        #ssize = self.ssize_gen()
-
         mod, err_m, t0, err_t0, Ha, err_Ha, theta, err_theta, tau, err_tau,ssize, stype, RA, DEC ,flux= self.output_gen()
         obs_yrs = self.obs_time / (3600. * 24. * 365.25)
         t_mask=np.where(np.float(obs_yrs)<=t0)
@@ -418,34 +429,36 @@ class SIM(object):
         err_m[t_mask] = err_m[t_mask] * (np.float(obs_yrs) / t0[t_mask])
 
         #mp = np.random.normal(loc=mod, scale=err_m)
-        print(np.max(mod))
-        mp= np.random.uniform(low=mod-err_m, high= mod+err_m)
-        print(np.max(mp))
-        v_mask=np.where(mp*flux>=self.low_Flim*3.)
+        lowmask=np.where(mod-err_m<0)
+        lowm=mod-err_m
+        highm=mod+err_m
+        lowm[lowmask]=0
+        mp= np.random.uniform(low=lowm, high=highm )
+        v_mask=np.where(mp*flux/self.low_Flim>=self.low_Flim*(5./3.))
         m_mask=np.where(mp>=self.mod_cutoff)
-        var_mask=np.where((mp*flux>=self.low_Flim*3.) & (mp>=self.mod_cutoff))
+        var_mask=np.where((mp*flux>=self.low_Flim*(5./3.)) & (mp>=self.mod_cutoff))
 
         vcount = len(v_mask[0])
         mcount = len(m_mask[0])
         varcount = len(var_mask[0])
-        #print(vcount,mcount)
-        #print(np.nanmean(theta*3600))
         mareal = float(mcount) / self.area
         vareal = float(vcount) / self.area
         varareal=float(varcount)/ self.area
-        print(mcount, vcount, varcount)
+        print(len(mod),mcount, vcount, varcount)
 
         datatab1 = Table()
+
         mvar=int(self.map)
-        datafile = self.region_name[8:-4] + '_test_19' +'_m{0}_data.csv'.format(mvar)
-        #print('mod_mean',np.mean(mod))
+
+        datafile = outfile[:-4]+'_m{0}_t{1}_data{2}.csv'.format(mvar,self.obs_time/(24. * 60. * 60.),self.itera)
+        self.itera=self.itera+1
         ### DATA FILE
         datatab1.add_column(Column(data=RA, name='RA'))
         datatab1.add_column(Column(data=DEC, name='DEC'))
         datatab1.add_column(Column(data=flux, name='flux'))
         datatab1.add_column(Column(data=Ha, name='H_Alpha'))
         datatab1.add_column(Column(data=err_Ha, name='H_Alpha err'))
-        datatab1.add_column(Column(data=mod, name='Modulation'))
+        datatab1.add_column(Column(data=mp, name='Modulation'))
         datatab1.add_column(Column(data=err_m, name='Modulation err'))
         datatab1.add_column(Column(data=t0, name='Timescale'))
         datatab1.add_column(Column(data=err_t0, name='Timescale err'))
@@ -498,19 +511,19 @@ def test():
     datatab=Table()
     resultstab=Table()
     if outfile != False:
-        datafile=outfile[:-4]+'_data'+outfile[-4:]
-        ### DATA FILE
-        datatab.add_column(Column(data=np.arange(1,len(areal_arr)+1,1), name='Interations'))
-        datatab.add_column(Column(data=Ha_arr[:,0], name='H_Alpha Mean'))
-        datatab.add_column(Column(data=Ha_arr[:,1], name='H_Alpha STD'))
-        datatab.add_column(Column(data=mod_arr[:,0], name='Modulation Mean'))
-        datatab.add_column(Column(data=mod_arr[:,1], name='Modulation STD'))
-        datatab.add_column(Column(data=t0_arr[:,0], name='Timescale Mean'))
-        datatab.add_column(Column(data=t0_arr[:,1], name='Timescale STD'))
-        datatab.add_column(Column(data=theta_arr[:,0], name='Theta Mean'))
-        datatab.add_column(Column(data=theta_arr[:,1], name='Theta STD'))
-        datatab.add_column(Column(data=areal_arr, name='Areal Sky Density'))
-        datatab.write(datafile, overwrite=True)
+        # datafile=outfile[:-4]+'_data'+outfile[-4:]
+        # ### DATA FILE
+        # datatab.add_column(Column(data=np.arange(1,len(areal_arr)+1,1), name='Interations'))
+        # datatab.add_column(Column(data=Ha_arr[:,0], name='H_Alpha Mean'))
+        # datatab.add_column(Column(data=Ha_arr[:,1], name='H_Alpha STD'))
+        # datatab.add_column(Column(data=mod_arr[:,0], name='Modulation Mean'))
+        # datatab.add_column(Column(data=mod_arr[:,1], name='Modulation STD'))
+        # datatab.add_column(Column(data=t0_arr[:,0], name='Timescale Mean'))
+        # datatab.add_column(Column(data=t0_arr[:,1], name='Timescale STD'))
+        # datatab.add_column(Column(data=theta_arr[:,0], name='Theta Mean'))
+        # datatab.add_column(Column(data=theta_arr[:,1], name='Theta STD'))
+        # datatab.add_column(Column(data=areal_arr, name='Areal Sky Density'))
+        # datatab.write(datafile, overwrite=True)
 
         ##RESUTLS FILE
         resultsfile = outfile[:-4] + '_results' + outfile[-4:]
