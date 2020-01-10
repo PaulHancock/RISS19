@@ -52,7 +52,7 @@ if __name__ == "__main__":
                         help='Include all of the above parameter calculations')
 
     group2 = parser.add_argument_group('Input and output data')
-    group2.add_argument('--in', dest='infile', default=None, type=argparse.FileType('r'),
+    group2.add_argument('--in', dest='infile', default=None, type=str,
                         help="Table of coordinates")
     group2.add_argument('--incol', dest='cols', default=('ra', 'dec'), nargs=2, type=str,
                         help='Column names to read from input. [ra,dec]')
@@ -160,7 +160,7 @@ if __name__ == "__main__":
         ra = tab[results.cols[0]]
         dec = tab[results.cols[1]]
         # create the sky coordinate
-        pos = SkyCoord(ra*u.degree, dec*u.degree, frame=frame)
+        pos = SkyCoord(ra, dec, unit=(u.deg, u.deg), frame=frame)
         # make the SM object
         sm = SM(ha_file=os.path.join(datadir, 'Halpha_map.fits'),
                 err_file=os.path.join(datadir, 'Halpha_error.fits'),
