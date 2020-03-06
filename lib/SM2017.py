@@ -18,7 +18,7 @@ import logging
 from scipy.special import gamma
 
 __author__ = ['Paul Hancock', 'Elliott Charlton']
-__date__ = '2019-06-07'
+__date__ = '2020-03-06'
 
 SECONDS_PER_YEAR = 3600 * 24 * 365.25
 
@@ -192,7 +192,7 @@ class SM(object):
         timescale is in years
         :param position: astropy.coordinates.SkyCoord
         :param ssize: source size in deg
-        :return:
+        :return: timescale in years
         """
 
         xi, err_xi = self.get_xi(position)
@@ -216,12 +216,12 @@ class SM(object):
         :param ssize: source size in deg
         :param nyears: timescale of interest
         :param ssize: source size in deg
-        :return:
+        :return: fractional variability
         """
         ssize = np.zeros(len(position)) + ssize
         tref, err_tref = self.get_timescale(position, ssize=ssize)
         m, err_m = self.get_m(position, ssize=ssize)
-        short = np.where(nyears * SECONDS_PER_YEAR < tref)
+        short = np.where(nyears < tref)
         m[short] *= (nyears / tref[short])
         err_m[short] = np.sqrt((err_m[short]/m[short]) ** 2. + (err_tref[short] / tref[short]) ** 2.) * m[short]
         return m, err_m
