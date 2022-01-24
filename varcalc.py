@@ -16,7 +16,8 @@ import numpy as np
 
 # Turn off the stupid warnings that Astropy emits when loading just about any fits file.
 import warnings
-warnings.simplefilter('ignore', category=AstropyWarning)
+
+warnings.simplefilter("ignore", category=AstropyWarning)
 
 # configure logging
 logging.basicConfig(format="%(module)s:%(levelname)s %(message)s")
@@ -27,53 +28,149 @@ log.setLevel(logging.INFO)
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    group1 = parser.add_argument_group('Output parameter selection')
-    group1.add_argument('--Halpha', dest='halpha', action='store_true', default=False,
-                        help='Calculate Hα intensity (Rayleighs)')
-    group1.add_argument('--xi', dest='xi', action='store_true', default=False,
-                        help='Calculate ξ (dimensionless)')
-    group1.add_argument('--mod', dest='m', action='store_true', default=False,
-                        help='Calculate modulation index (fraction)')
-    group1.add_argument('--sm', dest='sm', action='store_true', default=False,
-                        help='Calculate scintillation measure (kpc m^{-20/3})')
-    group1.add_argument('--timescale', dest='t0', action='store_true', default=False,
-                        help='Calculate timescale of variability (years)')
-    group1.add_argument('--rms1y', dest='rms', action='store_true', default=False,
-                        help='Calculate rms variability over 1 year (fraction/year)')
-    group1.add_argument('--theta', dest='theta', action='store_true', default=False,
-                        help='Calculate the scattering disk size (deg)')
-    group1.add_argument('--nuzero', dest='nuzero', action='store_true', default=False,
-                        help='Calculate the transition frequency (GHz)')
-    group1.add_argument('--fzero', dest='fzero', action='store_true', default=False,
-                        help='Calculate the Fresnel zone (deg)')
-    group1.add_argument('--dist', dest='dist', action='store_true', default=False,
-                        help='Calculate the model distance')
-    group1.add_argument('--all', dest='do_all', action='store_true', default=False,
-                        help='Include all of the above parameter calculations')
+    group1 = parser.add_argument_group("Output parameter selection")
+    group1.add_argument(
+        "--Halpha",
+        dest="halpha",
+        action="store_true",
+        default=False,
+        help="Calculate Hα intensity (Rayleighs)",
+    )
+    group1.add_argument(
+        "--xi",
+        dest="xi",
+        action="store_true",
+        default=False,
+        help="Calculate ξ (dimensionless)",
+    )
+    group1.add_argument(
+        "--mod",
+        dest="m",
+        action="store_true",
+        default=False,
+        help="Calculate modulation index (fraction)",
+    )
+    group1.add_argument(
+        "--sm",
+        dest="sm",
+        action="store_true",
+        default=False,
+        help="Calculate scintillation measure (kpc m^{-20/3})",
+    )
+    group1.add_argument(
+        "--timescale",
+        dest="t0",
+        action="store_true",
+        default=False,
+        help="Calculate timescale of variability (years)",
+    )
+    group1.add_argument(
+        "--rms1y",
+        dest="rms",
+        action="store_true",
+        default=False,
+        help="Calculate rms variability over 1 year (fraction/year)",
+    )
+    group1.add_argument(
+        "--theta",
+        dest="theta",
+        action="store_true",
+        default=False,
+        help="Calculate the scattering disk size (deg)",
+    )
+    group1.add_argument(
+        "--nuzero",
+        dest="nuzero",
+        action="store_true",
+        default=False,
+        help="Calculate the transition frequency (GHz)",
+    )
+    group1.add_argument(
+        "--fzero",
+        dest="fzero",
+        action="store_true",
+        default=False,
+        help="Calculate the Fresnel zone (m)",
+    )
+    group1.add_argument(
+        "--dist",
+        dest="dist",
+        action="store_true",
+        default=False,
+        help="Calculate the model distance",
+    )
+    group1.add_argument(
+        "--all",
+        dest="do_all",
+        action="store_true",
+        default=False,
+        help="Include all of the above parameter calculations",
+    )
 
-    group2 = parser.add_argument_group('Input and output data')
-    group2.add_argument('--in', dest='infile', default=None, type=str,
-                        help="Table of coordinates")
-    group2.add_argument('--incol', dest='cols', default=('ra', 'dec'), nargs=2, type=str,
-                        help='Column names to read from input. [ra,dec]')
-    group2.add_argument('--out', dest='outfile', default=None, type=str,
-                        help="Table of results")
-    group2.add_argument('--append', dest='append', action='store_true', default=False,
-                        help="Append the data to the input data (write a new file)")
-    group2.add_argument('--pos', dest='pos', default=None, nargs=2, type=float,
-                        help="Single coordinates in ra/dec degrees")
-    group2.add_argument('-g', '--galactic', dest='galactic', action='store_true', default=False,
-                        help='Interpret input coordinates as l/b instead of ra/dec (default False)')
-    group2.add_argument('--debug', dest='debug', action='store_true', default=False,
-                        help='Debug mode (default False)')
+    group2 = parser.add_argument_group("Input and output data")
+    group2.add_argument(
+        "--in", dest="infile", default=None, type=str, help="Table of coordinates"
+    )
+    group2.add_argument(
+        "--incol",
+        dest="cols",
+        default=("ra", "dec"),
+        nargs=2,
+        type=str,
+        help="Column names to read from input. [ra,dec]",
+    )
+    group2.add_argument(
+        "--out", dest="outfile", default=None, type=str, help="Table of results"
+    )
+    group2.add_argument(
+        "--append",
+        dest="append",
+        action="store_true",
+        default=False,
+        help="Append the data to the input data (write a new file)",
+    )
+    group2.add_argument(
+        "--pos",
+        dest="pos",
+        default=None,
+        nargs=2,
+        type=float,
+        help="Single coordinates in ra/dec degrees",
+    )
+    group2.add_argument(
+        "-g",
+        "--galactic",
+        dest="galactic",
+        action="store_true",
+        default=False,
+        help="Interpret input coordinates as l/b instead of ra/dec (default False)",
+    )
+    group2.add_argument(
+        "--debug",
+        dest="debug",
+        action="store_true",
+        default=False,
+        help="Debug mode (default False)",
+    )
 
-    group3 = parser.add_argument_group('Input parameter settings')
-    group3.add_argument('--freq', dest='frequency', default=185, type=float,
-                        help="Frequency in MHz")
-    group3.add_argument('--dist_in', dest='dist_in', type=float, default=None,
-                        help="Distance to scattering screen in kpc")
-    group3.add_argument('--vel', dest='velocity', default=10, type=float,
-                        help="Relative motion of screen and observer in km/s")
+    group3 = parser.add_argument_group("Input parameter settings")
+    group3.add_argument(
+        "--freq", dest="frequency", default=185, type=float, help="Frequency in MHz"
+    )
+    group3.add_argument(
+        "--dist_in",
+        dest="dist_in",
+        type=float,
+        default=None,
+        help="Distance to scattering screen in kpc",
+    )
+    group3.add_argument(
+        "--vel",
+        dest="velocity",
+        default=10,
+        type=float,
+        help="Relative motion of screen and observer in km/s",
+    )
 
     results = parser.parse_args()
 
@@ -86,11 +183,11 @@ if __name__ == "__main__":
         results.dist = True
 
     # data is stored in the data dir, relative to *this* file
-    datadir = os.path.join(os.path.dirname(__file__), 'data')
+    datadir = os.path.join(os.path.dirname(__file__), "data")
 
-    nu = results.frequency*1e6 # GHz
-    v = results.velocity * 1e3 # km/s
-    d = results.dist_in # kpc
+    nu = results.frequency * 1e6  # GHz
+    v = results.velocity * 1e3  # km/s
+    d = results.dist_in  # kpc
     # For doing a one off position calculation
 
     if results.pos is None and results.infile is None:
@@ -99,24 +196,26 @@ if __name__ == "__main__":
 
     if results.galactic:
         log.info("Using galactic coordinates")
-        frame = 'galactic'
+        frame = "galactic"
     else:
         log.info("Using fk5 coordinates")
-        frame = 'fk5'
+        frame = "fk5"
 
     if results.pos:
         ra, dec = results.pos
-        pos = SkyCoord([ra]*u.degree, [dec]*u.degree, frame=frame)
-        log.info(os.path.join(datadir, 'Halpha_error.fits'))
-        sm = SM(ha_file=os.path.join(datadir, 'Halpha_map.fits'),
-                err_file=os.path.join(datadir, 'Halpha_error.fits'),
-                nu=nu,
-                log=log,
-                d=d,
-                v=v)
+        pos = SkyCoord([ra] * u.degree, [dec] * u.degree, frame=frame)
+        log.info(os.path.join(datadir, "Halpha_error.fits"))
+        sm = SM(
+            ha_file=os.path.join(datadir, "Halpha_map.fits"),
+            err_file=os.path.join(datadir, "Halpha_error.fits"),
+            nu=nu,
+            log=log,
+            d=d,
+            v=v,
+        )
         if results.halpha:
             logging.debug(sm.get_halpha(pos))
-            val,err=sm.get_halpha(pos)
+            val, err = sm.get_halpha(pos)
             print("Halpha: ", val, "(Rayleighs)")
             print("err_Halpha: ", err, "(Rayleighs)")
         if results.xi:
@@ -129,16 +228,16 @@ if __name__ == "__main__":
             print("err_sm: ", err, "kpc m^{-20/3}")
         if results.m:
             val, err = sm.get_m(pos)
-            print("m: ", val*100, "%")
-            print("err_m: ", err*100, "%")
+            print("m: ", val * 100, "%")
+            print("err_m: ", err * 100, "%")
         if results.t0:
             val, err = sm.get_timescale(pos)
             print("t0: ", val, "years")
             print("err_t0: ", err, "years")
         if results.rms:
             val, err = sm.get_rms_var(pos)
-            print("rms: ", val*100, "%/1year")
-            print("err_rms: ", err*100, "%/1year")
+            print("rms: ", val * 100, "%/1year")
+            print("err_rms: ", err * 100, "%/1year")
         if results.theta:
             val, err = sm.get_theta(pos)
             print("theta: ", val, "deg")
@@ -149,6 +248,9 @@ if __name__ == "__main__":
         if results.dist:
             val = sm.get_distance(pos)
             print("distance: ", val, "kpc")
+        if results.fzero:
+            val = sm.get_rf(pos)
+            print("fzero: ", val, "m")
         sys.exit(0)
 
     if results.infile:
@@ -162,12 +264,14 @@ if __name__ == "__main__":
         # create the sky coordinate
         pos = SkyCoord(ra, dec, unit=(u.deg, u.deg), frame=frame)
         # make the SM object
-        sm = SM(ha_file=os.path.join(datadir, 'Halpha_map.fits'),
-                err_file=os.path.join(datadir, 'Halpha_error.fits'),
-                nu=nu,
-                log=log,
-                d=d,
-                v=v)
+        sm = SM(
+            ha_file=os.path.join(datadir, "Halpha_map.fits"),
+            err_file=os.path.join(datadir, "Halpha_error.fits"),
+            nu=nu,
+            log=log,
+            d=d,
+            v=v,
+        )
         # make a new table for writing and copy the ra/dec unless we are appending to the old file
         if not results.append:
             tab = Table()
@@ -176,38 +280,41 @@ if __name__ == "__main__":
         else:
             print("Appending results to existing table")
         if results.halpha:
-            val, err=sm.get_halpha(pos)
-            tab.add_column(Column(data=val, name='Halpha'))
-            tab.add_column(Column(data=err, name='err_Halpha'))
+            val, err = sm.get_halpha(pos)
+            tab.add_column(Column(data=val, name="Halpha"))
+            tab.add_column(Column(data=err, name="err_Halpha"))
         if results.dist:
             val = sm.get_distance(pos)
-            tab.add_column(Column(data=val, name='Distance'))
+            tab.add_column(Column(data=val, name="Distance"))
         if results.xi:
             val, err = sm.get_xi(pos)
-            tab.add_column(Column(data=val, name='xi'))
-            tab.add_column(Column(data=err, name='err_xi'))
+            tab.add_column(Column(data=val, name="xi"))
+            tab.add_column(Column(data=err, name="err_xi"))
         if results.sm:
             val, err = sm.get_sm(pos)
-            tab.add_column(Column(data=val, name='sm'))
-            tab.add_column(Column(data=err, name='err_sm'))
+            tab.add_column(Column(data=val, name="sm"))
+            tab.add_column(Column(data=err, name="err_sm"))
         if results.m:
             val, err = sm.get_m(pos)
-            tab.add_column(Column(data=val, name='m'))
-            tab.add_column(Column(data=err, name='err_m'))
+            tab.add_column(Column(data=val, name="m"))
+            tab.add_column(Column(data=err, name="err_m"))
         if results.t0:
             val, err = sm.get_timescale(pos)
-            tab.add_column(Column(data=val, name='t0'))
-            tab.add_column(Column(data=err, name='err_t0'))
+            tab.add_column(Column(data=val, name="t0"))
+            tab.add_column(Column(data=err, name="err_t0"))
         if results.rms:
             val, err = sm.get_rms_var(pos)
-            tab.add_column(Column(data=val, name='rms1yr'))
-            tab.add_column(Column(data=err, name='err_rms1yr'))
+            tab.add_column(Column(data=val, name="rms1yr"))
+            tab.add_column(Column(data=err, name="err_rms1yr"))
         if results.theta:
             val, err = sm.get_theta(pos)
-            tab.add_column(Column(data=val, name='theta_r'))
-            tab.add_column(Column(data=err, name='err_theta_r'))
+            tab.add_column(Column(data=val, name="theta_r"))
+            tab.add_column(Column(data=err, name="err_theta_r"))
         if results.nuzero:
             val = sm.get_vo(pos)
-            tab.add_column(Column(data=val, name='nu0'))
+            tab.add_column(Column(data=val, name="nu0"))
+        if results.fzero:
+            val = sm.get_rf(pos)
+            tab.add_column(Column(data=val, name="fzero"))
         print("Writing to {0}".format(results.outfile))
         tab.write(results.outfile, overwrite=True)
