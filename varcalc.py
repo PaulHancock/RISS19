@@ -7,7 +7,7 @@ from astropy.table import Table, Column
 import astropy.units as u
 from astropy.utils.exceptions import AstropyWarning
 
-from lib.SM2017 import SM
+from lib.SM2017 import SM, kpc
 import logging
 import os
 import sys
@@ -249,8 +249,8 @@ if __name__ == "__main__":
             val = sm.get_distance(pos)
             print("distance: ", val, "kpc")
         if results.fzero:
-            val = sm.get_rf(pos)
-            print("fzero: ", val, "m")
+            val = np.degrees(sm.get_rf(pos) / (sm.get_distance(pos) * kpc.value))
+            print("fzero: ", val, "deg")
         sys.exit(0)
 
     if results.infile:
@@ -314,7 +314,7 @@ if __name__ == "__main__":
             val = sm.get_vo(pos)
             tab.add_column(Column(data=val, name="nu0"))
         if results.fzero:
-            val = sm.get_rf(pos)
+            val = np.degrees(sm.get_rf(pos) / (sm.get_distance(pos) * kpc.value))
             tab.add_column(Column(data=val, name="fzero"))
         print("Writing to {0}".format(results.outfile))
         tab.write(results.outfile, overwrite=True)
